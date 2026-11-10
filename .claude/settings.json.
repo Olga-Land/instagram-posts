@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__AnythingMCP__anythingmcp_run_write_tool"
+    ]
+  }
+}
