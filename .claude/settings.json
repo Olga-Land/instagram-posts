@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__AnythingMCP__anythingmcp_run_write_tool"
+      "mcp__AnythingMCP__anythingmcp_run_write_tool",
+      "mcp__Windsor_ai_for_Social_Media__execute_action"
     ]
   }
 }
