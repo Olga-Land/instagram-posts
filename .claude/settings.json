@@ -1,8 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "mcp__AnythingMCP__anythingmcp_run_write_tool",
-      "mcp__Windsor_ai_for_Social_Media__execute_action"
+      "mcp__AnythingMCP",
+      "mcp__Windsor_ai_for_Social_Media",
+      "mcp__e9180341-45c1-4ebc-82b8-54e921181d82",
+      "mcp__265e0368-3f76-43f0-b188-f5e63ccc07ee",
+      "Bash(git:*)",
+      "Bash(python3:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)"
     ]
   }
 }
