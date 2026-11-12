@@ -1,0 +1,41 @@
+name: Публикация по расписанию
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # каждые 15 минут (GitHub иногда запаздывает на 5–15 минут)
+  workflow_dispatch: {}       # кнопка «Run workflow» для ручного запуска
+
+concurrency:
+  group: publish              # два запуска одновременно не публикуют дважды
+  cancel-in-progress: false
+
+permissions:
+  contents: write             # чтобы записать ссылки в post.yml
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -q httpx python-dotenv pyyaml
+      - name: Публикуем одобренные посты
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          POST_TIMEZONE: Europe/Moscow
+        run: python .github/scripts/publish.py
+      - name: Сохраняем отметки о публикации
+        run: |
+          git config user.name "publish-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add slides
+          git diff --cached --quiet && exit 0
+          git commit -m "Опубликовано: отметки в post.yml"
+          git pull --rebase
+          git push
