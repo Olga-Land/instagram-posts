@@ -18,26 +18,42 @@ jobs:
             echo "::error::Не задан GitHub Secret IG_TOKEN"
             exit 1
           fi
-          if [ -z "${IG_USER_ID:-}" ]; then
-            echo "::error::Не задана GitHub Variable IG_USER_ID"
-            exit 1
-          fi
-          BASE="${IG_API_BASE:-https://graph.facebook.com/v26.0}"
-          BASE="${BASE%/}"
+          BASE="${IG_API_BASE%/}"
           echo "Проверяем профиль Instagram ID ${IG_USER_ID} через ${BASE}"
-          BODY=$(curl --fail-with-body --silent --show-error --get "${BASE}/${IG_USER_ID}" \
-            --data-urlencode "fields=username,account_type" \
-            --data-urlencode "access_token=${IG_TOKEN}")
-          echo "$BODY" | jq -e '.username' >/dev/null
-          USERNAME=$(echo "$BODY" | jq -r '.username')
-          TYPE=$(echo "$BODY" | jq -r '.account_type // "unknown"')
+
+          request() {
+            local url="$1"
+            shift
+            local body_file
+            body_file=$(mktemp)
+            local status
+            status=$(curl --silent --show-error --get "$url" "$@" \
+              --data-urlencode "access_token=${IG_TOKEN}" \
+              --output "$body_file" --write-out '%{http_code}')
+            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+              echo "::error::Instagram API вернул HTTP $status"
+              if jq -e '.error' "$body_file" >/dev/null 2>&1; then
+                jq -c '.error | {type,code,error_subcode,message,fbtrace_id}' "$body_file"
+              else
+                echo "Ответ API не в формате JSON; тело ответа скрыто."
+              fi
+              rm -f "$body_file"
+              return 1
+            fi
+            cat "$body_file"
+            rm -f "$body_file"
+          }
+
+          BODY=$(request "${BASE}/${IG_USER_ID}" \
+            --data-urlencode "fields=username")
+          USERNAME=$(echo "$BODY" | jq -r '.username // empty')
           if [ "$USERNAME" != "lab_of_landscape" ]; then
-            echo "::error::Токен открыл другой аккаунт: @${USERNAME}"
+            echo "::error::Токен не подтвердил ожидаемый аккаунт @lab_of_landscape"
             exit 1
           fi
-          echo "::notice::Профиль подтверждён: @${USERNAME} (${TYPE})"
-          MEDIA=$(curl --fail-with-body --silent --show-error --get "${BASE}/${IG_USER_ID}/media" \
-            --data-urlencode "fields=id,media_type" --data-urlencode "limit=1" \
-            --data-urlencode "access_token=${IG_TOKEN}")
+          echo "::notice::Профиль подтверждён: @${USERNAME}"
+
+          MEDIA=$(request "${BASE}/${IG_USER_ID}/media" \
+            --data-urlencode "fields=id,media_type" --data-urlencode "limit=1")
           echo "$MEDIA" | jq -e 'has("data")' >/dev/null
           echo "::notice::Чтение Instagram Media API успешно. Ничего не опубликовано."
