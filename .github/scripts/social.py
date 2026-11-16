@@ -39,6 +39,12 @@ def _resolve_ig_user_id():
     body = response.json()
     if "error" in body:
         error = body["error"]
+        if error.get("code") == 190 and error.get("error_subcode") in (459, 464):
+            raise RuntimeError(
+                "Meta заблокировала API-сессию Facebook-пользователя. "
+                "Войдите в facebook.com под тем же профилем, подтвердите аккаунт "
+                "или завершите проверку безопасности, затем создайте новый токен Unified Login."
+            )
         raise RuntimeError(
             "Не удалось получить Instagram-активы Unified Login: "
             f"{error.get('message')} (код {error.get('code')}, "
