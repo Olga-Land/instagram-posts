@@ -28,6 +28,9 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_API_BASE: ${{ vars.IG_API_BASE }}
+          IG_USER_ID: ${{ vars.IG_USER_ID }}
+          IG_TOKEN_TYPE: ${{ vars.IG_TOKEN_TYPE }}
           POST_TIMEZONE: Europe/Moscow
         run: python .github/scripts/publish.py
       - name: Сохраняем отметки о публикации
