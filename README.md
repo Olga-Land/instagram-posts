@@ -27,10 +27,8 @@ GitHub → этот репозиторий → **Settings → Secrets and variab
 Ручной запуск: вкладка **Actions** → «Публикация по расписанию» → **Run workflow**.
 
 
-## Настройка режима Instagram API
-По умолчанию используется Instagram Login (graph.instagram.com). Для режима Facebook Login / Unified Login задайте в Settings → Secrets and variables → Actions → Variables:
-- IG_API_BASE = https://graph.facebook.com/v27.0
-- IG_USER_ID = числовой ID профессионального Instagram-аккаунта
-- IG_TOKEN_TYPE = facebook_login
+## Настройка Instagram API (Unified Login)
 
-Токен в обоих режимах хранится только в секрете IG_TOKEN. Не вставляйте токен или App Secret в файлы репозитория. Автопродление через graph.instagram.com/refresh_access_token применяется только к Instagram Login; для Facebook/Unified Login оно отключается, чтобы не испортить секрет.
+Для нового приложения Meta используется Unified Login: токен выдаётся для Instagram-активов бизнес-портфеля и работает через `graph.facebook.com`. В GitHub workflow уже настроены актуальная версия Graph API и автоматический поиск аккаунта `@lab_of_landscape` через `/me/assigned_instagram_accounts`; вручную задавать ID аккаунта не требуется.
+
+Секрет `IG_TOKEN` должен быть токеном, созданным для конфигурации Facebook Login for Business с выбранным Instagram-аккаунтом и разрешениями публикации. Автопродление через `graph.instagram.com/refresh_access_token` к Unified Login не применяется. Срок действия зависит от выбранной конфигурации Meta.
