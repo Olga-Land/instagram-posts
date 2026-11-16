@@ -20,8 +20,42 @@ load_dotenv(ENV_FILE)
 
 IG_API = (os.getenv("IG_API_BASE", "").strip() or "https://graph.instagram.com/v24.0").rstrip("/")
 IG_USER_ID = os.getenv("IG_USER_ID", "").strip()
+IG_USERNAME = (os.getenv("IG_USERNAME", "lab_of_landscape").strip().lstrip("@"))
 IG_TOKEN_TYPE = (os.getenv("IG_TOKEN_TYPE", "").strip().lower() or "instagram_login")
 http = httpx.Client(timeout=60)
+
+
+def _resolve_ig_user_id():
+    """Resolve the selected Instagram business asset shared through Unified Login."""
+    global IG_USER_ID
+    if IG_USER_ID:
+        return IG_USER_ID
+    if not IG_API.startswith("https://graph.facebook.com/"):
+        return ""
+    response = http.get(
+        f"{IG_API}/me/assigned_instagram_accounts",
+        params={"access_token": env("IG_TOKEN"), "fields": "id,username"},
+    )
+    body = response.json()
+    if "error" in body:
+        error = body["error"]
+        raise RuntimeError(
+            "Не удалось получить Instagram-активы Unified Login: "
+            f"{error.get('message')} (код {error.get('code')}, "
+            f"subcode {error.get('error_subcode')}). "
+            "Проверьте разрешение business_management в конфигурации Meta."
+        )
+    matches = [item for item in body.get("data", []) if item.get("username", "").lower() == IG_USERNAME.lower()]
+    if len(matches) != 1:
+        available = ", ".join("@" + str(x.get("username", "?")) for x in body.get("data", []))
+        raise RuntimeError(
+            f"В выданных Meta активах не найден единственный аккаунт @{IG_USERNAME}. "
+            f"Доступные аккаунты: {available or 'список пуст'}. "
+            "Проверьте, что Instagram-аккаунт выбран в конфигурации Unified Login."
+        )
+    IG_USER_ID = str(matches[0]["id"])
+    print(f"[OK] Unified Login: найден @{IG_USERNAME}, Instagram ID {IG_USER_ID}")
+    return IG_USER_ID
 
 
 def env(name, required=True):
@@ -134,10 +168,11 @@ def tg_post_link(msg):
 def ig(method, path, **params):
     """Instagram API request. Facebook Login mode addresses the IG account by its numeric ID."""
     if path == "me" or path.startswith("me/"):
-        if IG_USER_ID:
+        if IG_API.startswith("https://graph.facebook.com/"):
+            account_id = _resolve_ig_user_id()
+            path = account_id + path[2:]
+        elif IG_USER_ID:
             path = IG_USER_ID + path[2:]
-        elif IG_API.startswith("https://graph.facebook.com/"):
-            raise RuntimeError("Для graph.facebook.com задайте IG_USER_ID — ID профессионального Instagram-аккаунта")
     params["access_token"] = env("IG_TOKEN")
     r = http.request(method, f"{IG_API}/{path}", params=params)
     body = r.json()
