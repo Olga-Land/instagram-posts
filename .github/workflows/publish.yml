@@ -29,7 +29,7 @@ jobs:
           TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_API_BASE: https://graph.facebook.com/v27.0
-          IG_USER_ID: "17841453385120989"
+          IG_USERNAME: lab_of_landscape
           IG_TOKEN_TYPE: facebook_login
           POST_TIMEZONE: Europe/Moscow
         run: python .github/scripts/publish.py
