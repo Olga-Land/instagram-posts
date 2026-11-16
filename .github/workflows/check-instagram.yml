@@ -1,6 +1,11 @@
 name: Проверка подключения Instagram
 on:
   workflow_dispatch: {}
+  push:
+    paths:
+      - ".github/workflows/check-instagram.yml"
+  schedule:
+    - cron: "17 6 * * *" # ежедневная проверка без публикации
 permissions:
   contents: read
 jobs:
@@ -11,7 +16,7 @@ jobs:
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_USER_ID: "17841453385120989"
-          IG_API_BASE: https://graph.facebook.com/v26.0
+          IG_API_BASE: https://graph.facebook.com/v27.0
         run: |
           set -euo pipefail
           if [ -z "${IG_TOKEN:-}" ]; then
