@@ -25,3 +25,12 @@ GitHub → этот репозиторий → **Settings → Secrets and variab
 **GH_PAT:** github.com → аватар → Settings → Developer settings → Fine-grained tokens → Generate. Repository access: только `instagram-posts`. Permissions: **Secrets: Read and write**. Без этого секрета токен Instagram придётся обновлять вручную раз в 60 дней.
 
 Ручной запуск: вкладка **Actions** → «Публикация по расписанию» → **Run workflow**.
+
+
+## Настройка режима Instagram API
+По умолчанию используется Instagram Login (graph.instagram.com). Для режима Facebook Login / Unified Login задайте в Settings → Secrets and variables → Actions → Variables:
+- IG_API_BASE = https://graph.facebook.com/v27.0
+- IG_USER_ID = числовой ID профессионального Instagram-аккаунта
+- IG_TOKEN_TYPE = facebook_login
+
+Токен в обоих режимах хранится только в секрете IG_TOKEN. Не вставляйте токен или App Secret в файлы репозитория. Автопродление через graph.instagram.com/refresh_access_token применяется только к Instagram Login; для Facebook/Unified Login оно отключается, чтобы не испортить секрет.
