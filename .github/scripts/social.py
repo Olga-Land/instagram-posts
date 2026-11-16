@@ -18,7 +18,9 @@ ENV_FILE = HERE / ".env"
 STATE_DIR = HERE / "state"
 load_dotenv(ENV_FILE)
 
-IG_API = "https://graph.instagram.com/v24.0"
+IG_API = os.getenv("IG_API_BASE", "https://graph.instagram.com/v24.0").rstrip("/")
+IG_USER_ID = os.getenv("IG_USER_ID", "").strip()
+IG_TOKEN_TYPE = os.getenv("IG_TOKEN_TYPE", "instagram_login").strip().lower()
 http = httpx.Client(timeout=60)
 
 
@@ -130,6 +132,12 @@ def tg_post_link(msg):
 # ---------------- Instagram ----------------
 
 def ig(method, path, **params):
+    """Instagram API request. Facebook Login mode addresses the IG account by its numeric ID."""
+    if path == "me" or path.startswith("me/"):
+        if IG_USER_ID:
+            path = IG_USER_ID + path[2:]
+        elif IG_API.startswith("https://graph.facebook.com/"):
+            raise RuntimeError("Для graph.facebook.com задайте IG_USER_ID — ID профессионального Instagram-аккаунта")
     params["access_token"] = env("IG_TOKEN")
     r = http.request(method, f"{IG_API}/{path}", params=params)
     body = r.json()
@@ -177,7 +185,9 @@ def ig_recent_posts(limit=10):
 
 
 def ig_refresh_token():
-    """Продлевает долгоживущий токен ещё на 60 дней и записывает новый в .env."""
+    """Продлевает токен Instagram Login. Facebook/Unified Login uses a different token lifecycle."""
+    if IG_TOKEN_TYPE != "instagram_login" or not IG_API.startswith("https://graph.instagram.com/"):
+        raise RuntimeError("Автопродление доступно только для Instagram Login. Для текущего типа токена используйте его штатный механизм продления.")
     r = http.get("https://graph.instagram.com/refresh_access_token",
                  params={"grant_type": "ig_refresh_token", "access_token": env("IG_TOKEN")}).json()
     if "access_token" not in r:
@@ -223,7 +233,8 @@ def check():
         ok = False
         print(f"[ОШИБКА] Telegram: {e}")
     try:
-        me = ig("GET", "me", fields="username,account_type")
+        profile_path = IG_USER_ID if IG_USER_ID else "me"
+        me = ig("GET", profile_path, fields="username,account_type")
         print(f"[OK] Instagram: @{me['username']} ({me.get('account_type')})")
     except Exception as e:
         ok = False
