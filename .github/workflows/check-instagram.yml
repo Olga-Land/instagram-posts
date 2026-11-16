@@ -23,6 +23,29 @@ jobs:
             exit 1
           fi
           BASE="${IG_API_BASE%/}"
+          request() {
+            local url="$1"
+            shift
+            local body_file
+            body_file=$(mktemp)
+            local status
+            status=$(curl --silent --show-error --get "$url" "$@" \
+              --data-urlencode "access_token=${IG_TOKEN}" \
+              --output "$body_file" --write-out '%{http_code}')
+            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+              echo "::error::Instagram API вернул HTTP $status" >&2
+              if jq -e '.error' "$body_file" >/dev/null 2>&1; then
+                jq -c '.error | {type,code,error_subcode,message,fbtrace_id}' "$body_file" >&2
+              else
+                echo "Ответ API не в формате JSON; тело ответа скрыто." >&2
+              fi
+              rm -f "$body_file"
+              return 1
+            fi
+            cat "$body_file"
+            rm -f "$body_file"
+          }
+
           echo "Ищем аккаунт @lab_of_landscape среди активов, переданных через Unified Login"
 
           ASSETS=$(request "${BASE}/me/assigned_instagram_accounts" --data-urlencode "fields=id,username")
