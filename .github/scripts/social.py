@@ -18,9 +18,9 @@ ENV_FILE = HERE / ".env"
 STATE_DIR = HERE / "state"
 load_dotenv(ENV_FILE)
 
-IG_API = os.getenv("IG_API_BASE", "https://graph.instagram.com/v24.0").rstrip("/")
+IG_API = (os.getenv("IG_API_BASE", "").strip() or "https://graph.instagram.com/v24.0").rstrip("/")
 IG_USER_ID = os.getenv("IG_USER_ID", "").strip()
-IG_TOKEN_TYPE = os.getenv("IG_TOKEN_TYPE", "instagram_login").strip().lower()
+IG_TOKEN_TYPE = (os.getenv("IG_TOKEN_TYPE", "").strip().lower() or "instagram_login")
 http = httpx.Client(timeout=60)
 
 
