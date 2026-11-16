@@ -12,8 +12,8 @@ jobs:
       - name: Продлеваем токен и сохраняем в Secrets
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
-          IG_API_BASE: ${{ vars.IG_API_BASE }}
-          IG_TOKEN_TYPE: ${{ vars.IG_TOKEN_TYPE }}
+          IG_API_BASE: https://graph.facebook.com/v26.0
+          IG_TOKEN_TYPE: facebook_login
           GH_TOKEN: ${{ secrets.GH_PAT }}   # личный токен GitHub с правом Secrets: Read and write на этот репозиторий
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
