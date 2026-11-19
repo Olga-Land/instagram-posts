@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/check-telegram.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
   check-telegram:
     runs-on: ubuntu-latest
@@ -40,3 +40,26 @@ jobs:
           print('Channel ready: '+channel.get('title','(no title)'))
           print('Bot has permission to post. No messages were sent.')
           PY
+      - name: Save non-sensitive verification result
+        if: success()
+        run: |
+          mkdir -p telegram
+          python - <<'PY'
+          import json,datetime,pathlib
+          pathlib.Path('telegram/connection-status.json').write_text(
+            json.dumps({
+              'checked_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'telegram_bot_auth': True,
+              'channel_access': True,
+              'can_post_messages': True,
+              'personal_chat_access': True,
+              'posts_sent_during_test': 0
+            },indent=2)+'\n', encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add telegram/connection-status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record Telegram connection preflight status"
+            git push
+          fi
