@@ -1,0 +1,86 @@
+[
+  {
+    "day": "19-11",
+    "images": [
+      "publications/2026-11/19-11/01.jpg",
+      "publications/2026-11/19-11/02.jpg",
+      "publications/2026-11/19-11/03.jpg",
+      "publications/2026-11/19-11/04.jpg",
+      "publications/2026-11/19-11/05.jpg"
+    ],
+    "video": "publications/2026-11/19-11/reels.mp4",
+    "caption": "publications/2026-11/19-11/caption.txt"
+  },
+  {
+    "day": "20-11",
+    "images": [
+      "publications/2026-11/20-11/01.jpg",
+      "publications/2026-11/20-11/02.jpg",
+      "publications/2026-11/20-11/03.jpg",
+      "publications/2026-11/20-11/04.jpg",
+      "publications/2026-11/20-11/05.jpg"
+    ],
+    "video": "publications/2026-11/20-11/reels.mp4",
+    "caption": "publications/2026-11/20-11/caption.txt"
+  },
+  {
+    "day": "21-11",
+    "images": [
+      "publications/2026-11/21-11/01.jpg",
+      "publications/2026-11/21-11/02.jpg",
+      "publications/2026-11/21-11/03.jpg",
+      "publications/2026-11/21-11/04.jpg",
+      "publications/2026-11/21-11/05.jpg"
+    ],
+    "video": "publications/2026-11/21-11/reels.mp4",
+    "caption": "publications/2026-11/21-11/caption.txt"
+  },
+  {
+    "day": "22-11",
+    "images": [
+      "publications/2026-11/22-11/01.jpg",
+      "publications/2026-11/22-11/02.jpg",
+      "publications/2026-11/22-11/03.jpg",
+      "publications/2026-11/22-11/04.jpg",
+      "publications/2026-11/22-11/05.jpg"
+    ],
+    "video": "publications/2026-11/22-11/reels.mp4",
+    "caption": "publications/2026-11/22-11/caption.txt"
+  },
+  {
+    "day": "23-11",
+    "images": [
+      "publications/2026-11/23-11/01.jpg",
+      "publications/2026-11/23-11/02.jpg",
+      "publications/2026-11/23-11/03.jpg",
+      "publications/2026-11/23-11/04.jpg",
+      "publications/2026-11/23-11/05.jpg"
+    ],
+    "video": "publications/2026-11/23-11/reels.mp4",
+    "caption": "publications/2026-11/23-11/caption.txt"
+  },
+  {
+    "day": "24-11",
+    "images": [
+      "publications/2026-11/24-11/01.jpg",
+      "publications/2026-11/24-11/02.jpg",
+      "publications/2026-11/24-11/03.jpg",
+      "publications/2026-11/24-11/04.jpg",
+      "publications/2026-11/24-11/05.jpg"
+    ],
+    "video": "publications/2026-11/24-11/reels.mp4",
+    "caption": "publications/2026-11/24-11/caption.txt"
+  },
+  {
+    "day": "25-11",
+    "images": [
+      "publications/2026-11/25-11/01.jpg",
+      "publications/2026-11/25-11/02.jpg",
+      "publications/2026-11/25-11/03.jpg",
+      "publications/2026-11/25-11/04.jpg",
+      "publications/2026-11/25-11/05.jpg"
+    ],
+    "video": "publications/2026-11/25-11/reels.mp4",
+    "caption": "publications/2026-11/25-11/caption.txt"
+  }
+]
