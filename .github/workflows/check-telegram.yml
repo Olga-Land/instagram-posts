@@ -1,0 +1,42 @@
+name: Проверка подключения Telegram
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/check-telegram.yml'
+permissions:
+  contents: read
+jobs:
+  check-telegram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+      TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+      TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
+    steps:
+      - name: Verify bot token and channel publishing rights (read-only)
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request,urllib.parse
+          vals={k:os.getenv(k,'').strip() for k in ('TG_BOT_TOKEN','TG_CHAT_ID','TG_CHANNEL_ID')}
+          missing=[k for k,v in vals.items() if not v]
+          if missing:raise RuntimeError('Missing GitHub Actions Secrets: '+', '.join(missing))
+          def call(method,**args):
+              url='https://api.telegram.org/bot'+vals['TG_BOT_TOKEN']+'/'+method
+              with urllib.request.urlopen(urllib.request.Request(url,data=urllib.parse.urlencode(args).encode()),timeout=20) as r:
+                  response=json.load(r)
+              if not response.get('ok'):raise RuntimeError(method+': '+str(response.get('description')))
+              return response['result']
+          bot=call('getMe')
+          channel=call('getChat',chat_id=vals['TG_CHANNEL_ID'])
+          member=call('getChatMember',chat_id=vals['TG_CHANNEL_ID'],user_id=bot['id'])
+          role=member.get('status','unknown')
+          if role not in ('administrator','creator'):raise RuntimeError('Bot role in channel is '+role+', need administrator')
+          if role=='administrator' and member.get('can_post_messages') is not True:
+              raise RuntimeError('Telegram bot has no can_post_messages permission')
+          call('getChat',chat_id=vals['TG_CHAT_ID'])
+          print('Telegram ready: bot @'+bot.get('username','unknown'))
+          print('Channel ready: '+channel.get('title','(no title)'))
+          print('Bot has permission to post. No messages were sent.')
+          PY
