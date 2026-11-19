@@ -1,0 +1,60 @@
+name: Import approved media from Google Drive
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/import-approved-media.yml'
+permissions:
+  contents: write
+jobs:
+  import-media:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download shared Google Drive folder
+        run: |
+          python -m pip install --disable-pip-version-check gdown
+          mkdir -p /tmp/landscape-media
+          python -m gdown --folder 'https://drive.google.com/drive/folders/1kXigdShJnn_CDnQjWtWqiOgLSGZaZvOK' --output /tmp/landscape-media --remaining-ok
+      - name: Extract, validate, and stage media
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile, shutil, json, sys
+          source=Path('/tmp/landscape-media')
+          target=Path('publications/2026-11')
+          for archive in source.rglob('*.zip'):
+              with zipfile.ZipFile(archive) as z:
+                  for info in z.infolist():
+                      dest=(source/'extracted'/info.filename).resolve()
+                      if not str(dest).startswith(str((source/'extracted').resolve())+'/'):
+                          raise RuntimeError('Unsafe ZIP entry')
+                  z.extractall(source/'extracted')
+          days=[f'{day:02d}-11' for day in range(19,26)]
+          manifest=[]
+          for day in days:
+              candidates=[p for p in source.rglob(day) if p.is_dir()]
+              candidates=[p for p in candidates if all((p/f'{i:02d}.jpg').is_file() for i in range(1,6)) and (p/'reels.mp4').is_file() and (p/'caption.txt').is_file()]
+              if not candidates: raise RuntimeError(f'Missing or incomplete day {day}; no files published')
+              p=candidates[0]; dst=target/day;dst.mkdir(parents=True,exist_ok=True)
+              for i in range(1,6):shutil.copy2(p/f'{i:02d}.jpg',dst/f'{i:02d}.jpg')
+              shutil.copy2(p/'reels.mp4',dst/'reels.mp4')
+              shutil.copy2(p/'caption.txt',dst/'caption.txt')
+              manifest.append({'day':day,'images':[f'publications/2026-11/{day}/{i:02d}.jpg' for i in range(1,6)],'video':f'publications/2026-11/{day}/reels.mp4','caption':f'publications/2026-11/{day}/caption.txt'})
+          (target/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          print('Validated 35 JPG, 7 MP4, 7 captions.')
+          PY
+      - name: Commit verified media (no publishing)
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/2026-11
+          if ! git diff --cached --quiet; then
+            git commit -m 'Import approved November media from Google Drive'
+            git push
+          fi
