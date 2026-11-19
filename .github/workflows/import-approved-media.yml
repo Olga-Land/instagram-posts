@@ -1,60 +1,104 @@
-name: Import approved media from Google Drive
+name: Import approved media from Yandex Disk
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/import-approved-media.yml'
 permissions:
   contents: write
 jobs:
   import-media:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Download shared Google Drive folder
+      - name: Download public Yandex Disk files
+        env:
+          YANDEX_PUBLIC_URL: https://disk.yandex.ru/d/p1kS4UaWgAm-BQ
         run: |
-          python -m pip install --disable-pip-version-check gdown
-          mkdir -p /tmp/landscape-media
-          python -m gdown --folder 'https://drive.google.com/drive/folders/1kXigdShJnn_CDnQjWtWqiOgLSGZaZvOK' --output /tmp/landscape-media --remaining-ok
-      - name: Extract, validate, and stage media
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request, pathlib, time
+          base='https://cloud-api.yandex.net/v1/disk/public/resources'
+          key=os.environ['YANDEX_PUBLIC_URL']
+          root=pathlib.Path('/tmp/landscape-media');root.mkdir(parents=True,exist_ok=True)
+          def api(url, params):
+              query=urllib.parse.urlencode(params)
+              req=urllib.request.Request(url+'?'+query,headers={'User-Agent':'LandscapeImporter/1.0'})
+              with urllib.request.urlopen(req,timeout=45) as response:
+                  return json.load(response)
+          def scan(path='', depth=0):
+              if depth>10: raise RuntimeError('Folder nesting too deep')
+              offset=0
+              while True:
+                  params={'public_key':key,'limit':100,'offset':offset}
+                  if path:params['path']=path
+                  data=api(base,params)
+                  if data.get('type')=='file':
+                      items=[data]; total=1
+                  else:
+                      embedded=data.get('_embedded',{})
+                      items=embedded.get('items',[])
+                      total=embedded.get('total',len(items))
+                  for item in items:
+                      p=item.get('path','')
+                      if item['type']=='dir':
+                          scan(p,depth+1)
+                      elif item['type']=='file':
+                          relative=p.split(':',1)[-1].lstrip('/')
+                          if not relative:relative=item['name']
+                          target=(root/relative).resolve()
+                          if not target.is_relative_to(root.resolve()):
+                              raise RuntimeError('Unsafe Yandex path')
+                          target.parent.mkdir(parents=True,exist_ok=True)
+                          link=api('https://cloud-api.yandex.net/v1/disk/public/resources/download',{'public_key':key,'path':p})['href']
+                          for attempt in range(3):
+                              try:
+                                  with urllib.request.urlopen(link,timeout=120) as response,open(target,'wb') as output:
+                                      while True:
+                                          chunk=response.read(1024*1024)
+                                          if not chunk:break
+                                          output.write(chunk)
+                                  break
+                              except Exception:
+                                  if attempt==2:raise
+                                  time.sleep(3)
+                          print('Downloaded',relative,target.stat().st_size)
+                  offset+=len(items)
+                  if not items or offset>=total:break
+          scan()
+          if not any(root.rglob('*.*')):raise RuntimeError('Yandex folder is empty or inaccessible')
+          PY
+      - name: Validate complete weekly package
         run: |
           python - <<'PY'
           from pathlib import Path
-          import zipfile, shutil, json, sys
-          source=Path('/tmp/landscape-media')
-          target=Path('publications/2026-11')
-          for archive in source.rglob('*.zip'):
+          import zipfile, shutil, json
+          root=Path('/tmp/landscape-media');extracted=root/'extracted'
+          for archive in root.rglob('*.zip'):
               with zipfile.ZipFile(archive) as z:
                   for info in z.infolist():
-                      dest=(source/'extracted'/info.filename).resolve()
-                      if not str(dest).startswith(str((source/'extracted').resolve())+'/'):
-                          raise RuntimeError('Unsafe ZIP entry')
-                  z.extractall(source/'extracted')
-          days=[f'{day:02d}-11' for day in range(19,26)]
+                      dest=(extracted/info.filename).resolve()
+                      if not dest.is_relative_to(extracted.resolve()):
+                          raise RuntimeError('Unsafe ZIP path')
+                  z.extractall(extracted)
+          target=Path('publications/2026-11')
           manifest=[]
-          for day in days:
-              candidates=[p for p in source.rglob(day) if p.is_dir()]
+          for day in range(19,26):
+              key=f'{day:02d}-11'
+              candidates=[p for p in root.rglob(key) if p.is_dir()]
               candidates=[p for p in candidates if all((p/f'{i:02d}.jpg').is_file() for i in range(1,6)) and (p/'reels.mp4').is_file() and (p/'caption.txt').is_file()]
-              if not candidates: raise RuntimeError(f'Missing or incomplete day {day}; no files published')
-              p=candidates[0]; dst=target/day;dst.mkdir(parents=True,exist_ok=True)
-              for i in range(1,6):shutil.copy2(p/f'{i:02d}.jpg',dst/f'{i:02d}.jpg')
-              shutil.copy2(p/'reels.mp4',dst/'reels.mp4')
-              shutil.copy2(p/'caption.txt',dst/'caption.txt')
-              manifest.append({'day':day,'images':[f'publications/2026-11/{day}/{i:02d}.jpg' for i in range(1,6)],'video':f'publications/2026-11/{day}/reels.mp4','caption':f'publications/2026-11/{day}/caption.txt'})
+              if not candidates:raise RuntimeError(f'Incomplete package: {key}')
+              src=candidates[0];dst=target/key;dst.mkdir(parents=True,exist_ok=True)
+              for name in [*(f'{i:02d}.jpg' for i in range(1,6)),'reels.mp4','caption.txt']:
+                  shutil.copy2(src/name,dst/name)
+              manifest.append({'day':key,'images':[f'publications/2026-11/{key}/{i:02d}.jpg' for i in range(1,6)],'video':f'publications/2026-11/{key}/reels.mp4','caption':f'publications/2026-11/{key}/caption.txt'})
+          target.mkdir(parents=True,exist_ok=True)
           (target/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
-          print('Validated 35 JPG, 7 MP4, 7 captions.')
+          print('Validated: 7 days, 35 images, 7 videos, 7 captions')
           PY
-      - name: Commit verified media (no publishing)
+      - name: Commit validated files only (does not publish)
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add publications/2026-11
           if ! git diff --cached --quiet; then
-            git commit -m 'Import approved November media from Google Drive'
+            git commit -m 'Import approved media from Yandex Disk'
             git push
           fi
