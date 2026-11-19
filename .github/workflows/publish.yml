@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: "*/15 * * * *"   # каждые 15 минут (GitHub иногда запаздывает на 5–15 минут)
   workflow_dispatch: {}       # кнопка «Run workflow» для ручного запуска
+  push:
+    paths:
+      - 'slides/**/post.yml'    # сразу проверить новые/одобренные посты, не ждать cron
 
 concurrency:
   group: publish              # два запуска одновременно не публикуют дважды
