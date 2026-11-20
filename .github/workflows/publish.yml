@@ -45,3 +45,26 @@ jobs:
           git commit -m "Опубликовано: отметки в post.yml"
           git pull --rebase
           git push
+
+      - name: Уведомить о техническом сбое публикации в личный Telegram
+        if: failure()
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request
+          token=os.getenv('TG_BOT_TOKEN')
+          chat=os.getenv('TG_CHAT_ID')
+          if not token or not chat:
+              print('Telegram private notification not configured')
+              raise SystemExit(0)
+          msg='❌ Ошибка GitHub Actions при публикации «Лаборатории ландшафта». Проверь журнал: https://github.com/'+os.environ.get('GITHUB_REPOSITORY','Olga-Land/instagram-posts')+'/actions/runs/'+os.environ.get('GITHUB_RUN_ID','')
+          url='https://api.telegram.org/bot'+token+'/sendMessage'
+          data=json.dumps({'chat_id':chat,'text':msg}).encode()
+          with urllib.request.urlopen(urllib.request.Request(url,data=data,headers={'Content-Type':'application/json'}),timeout=20) as response:
+              result=json.load(response)
+          if not result.get('ok'):
+              raise RuntimeError('Telegram notification rejected')
+          print('Private Telegram failure notice delivered')
+          PY
