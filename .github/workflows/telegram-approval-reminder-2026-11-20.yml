@@ -1,0 +1,36 @@
+name: Напоминание о согласовании Instagram в Telegram (20 ноября)
+on:
+  schedule:
+    - cron: '0 10 20 11 *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  remind:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 10 20 11 *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify owner in private Telegram chat
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, datetime
+          if datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d') != '2026-11-20':
+              print('Reminder date has passed, skip.')
+              raise SystemExit(0)
+          token=os.getenv('TG_BOT_TOKEN','')
+          chat=os.getenv('TG_CHAT_ID','')
+          if not token or not chat:
+              raise RuntimeError('Telegram bot token or personal chat ID missing')
+          text='⏰ 13:00 МСК — согласовать изображения каруселей Instagram «Лаборатория ландшафта». Проверь оригинальный логотип в одну строку, пять слайдов каждой карусели и длинную подпись. До согласования автоматическая публикация отключена.'
+          url='https://api.telegram.org/bot'+token+'/sendMessage'
+          data=json.dumps({'chat_id':chat,'text':text}).encode()
+          request=urllib.request.Request(url,data=data,headers={'Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(request,timeout=20) as response:
+              result=json.load(response)
+          if not result.get('ok'):
+              raise RuntimeError('Telegram rejected reminder')
+          print('Private Telegram reminder delivered')
+          PY
