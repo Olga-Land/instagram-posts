@@ -40,7 +40,7 @@ jobs:
                   ofs+=len(items)
                   if not items or ofs>=es.get('total',ofs): break
           files=list(scan())
-          print('Public Yandex files:',len(files))
+          print('Public Yandex files:',len(files)); print('NAMES:',[(f.get('path'),f.get('name')) for f in files])
           matches=[f for f in files if f['name'].lower()=='instagram_final_20-25_nov_2026.zip']
           if len(matches)!=1:
               print('FINAL_ARCHIVE_NOT_PRESENT; matching names:',[f['name'] for f in files if 'final' in f['name'].lower()])
