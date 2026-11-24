@@ -1,0 +1,37 @@
+name: Finish Reel 25 with approved voice and rain
+on:
+  push:
+    paths:
+      - '.github/workflows/finish-reel-25-with-voice.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  mix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Download approved new montage and rain sound
+        run: |
+          curl -fL --retry 3 --max-time 100 -sS 'https://at.adobe.com/pcUGB7yrTZfQrvW1' -o /tmp/visual.mp4
+          curl -fL --retry 3 --max-time 100 -sS 'https://at.adobe.com/UM6tEvgYwE454xYZ' -o /tmp/rain_source.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 /tmp/visual.mp4
+          ffprobe -v error -select_streams a -show_entries stream=codec_name -of default=noprint_wrappers=1 /tmp/rain_source.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 publications/audio/deep_male_25nov_full.mp3
+      - name: Mix Deep Male speech over quiet natural rain
+        run: |
+          mkdir -p publications/reels/2026-11-25
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/visual.mp4 -i publications/audio/deep_male_25nov_full.mp3 -stream_loop -1 -i /tmp/rain_source.mp4 -filter_complex "[1:a]aresample=48000,volume=1.0[voice];[2:a]aresample=48000,volume=0.13[rain];[voice][rain]amix=inputs=2:duration=longest:dropout_transition=1:normalize=0[a]" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -ar 48000 -shortest -movflags +faststart publications/reels/2026-11-25/Reel_25Nov_DEEP_MALE_RAIN.mp4
+          ffprobe -v error -show_entries stream=codec_type,codec_name -of compact publications/reels/2026-11-25/Reel_25Nov_DEEP_MALE_RAIN.mp4
+          du -h publications/reels/2026-11-25/Reel_25Nov_DEEP_MALE_RAIN.mp4
+      - name: Save private-review reel (not scheduled)
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-25/Reel_25Nov_DEEP_MALE_RAIN.mp4
+          git commit -m 'Export 25 Nov Reel with approved Deep Male and rain for review'
+          git pull --rebase
+          git push
