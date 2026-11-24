@@ -1,0 +1,28 @@
+name: Save approved full Deep Male voice
+on:
+  push:
+    paths:
+      - '.github/workflows/import-full-voice-25.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-voice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download full-length generated Deep Male preview
+        run: |
+          mkdir -p publications/audio
+          curl -fLsS --retry 3 --max-time 55 'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/e852d69b-4881-400f-b2b0-751d54766596.mp3' -o publications/audio/deep_male_25nov_full.mp3
+          file publications/audio/deep_male_25nov_full.mp3
+          du -h publications/audio/deep_male_25nov_full.mp3
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 publications/audio/deep_male_25nov_full.mp3
+      - name: Publish audio source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/audio/deep_male_25nov_full.mp3
+          git commit -m 'Save approved full Deep Male voiceover for 25 Nov'
+          git pull --rebase
+          git push
