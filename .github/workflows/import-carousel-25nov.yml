@@ -1,0 +1,75 @@
+name: Import approved 25 Nov carousel from Yandex
+on:
+  push:
+    paths:
+      - '.github/workflows/import-carousel-25nov.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-25:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find approved package and import 25 Nov slides
+        env:
+          PUBLIC_KEY: https://disk.yandex.ru/d/p1kS4UaWgAm-BQ
+        run: |
+          python - <<'PY'
+          import urllib.request, urllib.parse, json, io, zipfile, pathlib, sys, os
+          base='https://cloud-api.yandex.net/v1/disk/public/resources'
+          def api(u,params):
+              with urllib.request.urlopen(urllib.request.Request(u+'?'+urllib.parse.urlencode(params),headers={'User-Agent':'LandscapeFinalImporter/1.0'}),timeout=35) as r:return json.load(r)
+          key=os.environ['PUBLIC_KEY']
+          def scan(path='',depth=0):
+              if depth>8:return
+              ofs=0
+              while True:
+                  params={'public_key':key,'limit':100,'offset':ofs}
+                  if path:params['path']=path
+                  info=api(base,params)
+                  contents=info.get('_embedded',{})
+                  items=contents.get('items',[])
+                  for x in items:
+                      if x['type']=='dir':yield from scan(x['path'],depth+1)
+                      else: yield x
+                  ofs+=len(items)
+                  if not items or ofs>=contents.get('total',ofs):break
+          files=list(scan())
+          print('SHARED_FILES',len(files),flush=True)
+          print('NAMES',[(f['name'],f['path']) for f in files if '25' in f['name'] or 'final' in f['name'].lower() or 'approved' in f['name'].lower()],flush=True)
+          wanted='Instagram_25-26_APPROVED_UPLOAD_READY.zip'
+          found=[f for f in files if f['name']==wanted]
+          if not found:
+              print('NO_APPROVED_ARCHIVE_IN_SHARE',flush=True)
+              sys.exit(2)
+          if len(found)!=1:raise Exception('Multiple copies of final file in shared folder')
+          url=api(base+'/download',{'public_key':key,'path':found[0]['path']})['href']
+          with urllib.request.urlopen(url,timeout=110) as r:b=r.read(30*1024*1024)
+          z=zipfile.ZipFile(io.BytesIO(b))
+          dest=pathlib.Path('publications/approved/2026-11-25')
+          dest.mkdir(parents=True,exist_ok=True)
+          for i in range(1,6):
+              src='2026-11-25/slide_%02d.jpg'%i
+              if src not in z.namelist():raise ValueError('Missing '+src)
+              data=z.read(src)
+              if len(data)<40000:raise ValueError('Unusually small image '+src)
+              (dest/('slide_%02d.jpg'%i)).write_bytes(data)
+              print('IMPORTED',src,len(data),flush=True)
+          cap='2026-11-25/ПОДПИСЬ.txt'
+          if cap not in z.namelist():raise ValueError('Missing caption')
+          txt=z.read(cap).decode('utf8')
+          (dest/'caption.txt').write_text(txt,encoding='utf8')
+          print('CAPTION_CHARS',len(txt),flush=True)
+          PY
+      - name: Commit imported approved media
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add publications/approved/2026-11-25
+          if ! git diff --cached --quiet; then
+            git commit -m 'Import user-approved carousel for 25 November'
+            git pull --rebase
+            git push
+          fi
