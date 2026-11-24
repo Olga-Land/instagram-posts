@@ -17,7 +17,6 @@ jobs:
           curl -fLsS --retry 3 --max-time 55 'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/e852d69b-4881-400f-b2b0-751d54766596.mp3' -o publications/audio/deep_male_25nov_full.mp3
           file publications/audio/deep_male_25nov_full.mp3
           du -h publications/audio/deep_male_25nov_full.mp3
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 publications/audio/deep_male_25nov_full.mp3
       - name: Publish audio source
         run: |
           git config user.name 'github-actions[bot]'
