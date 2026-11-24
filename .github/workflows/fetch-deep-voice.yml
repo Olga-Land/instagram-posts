@@ -33,7 +33,7 @@ jobs:
                       else:
                           t=data[:9000].decode('utf-8','ignore')
                           print('HTML_SNIPPET',t[:3500],flush=True)
-                          candidates=re.findall(r'https?[^"\\s\\']+\\.mp3[^"\\s\\']*',t)
+                          candidates=re.findall(r'https?[^\\s\\"<>]+[.]mp3[^\\s\\"<>]*',t)
                           print('AUDIO_CANDIDATES',candidates[:5],flush=True)
               except Exception as e:
                   print('FAILED',idx,str(e)[:450],flush=True)
