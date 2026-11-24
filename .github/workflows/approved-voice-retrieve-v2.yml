@@ -1,0 +1,48 @@
+name: Retrieve approved voice full
+on:
+  push:
+    paths:
+      - '.github/workflows/approved-voice-retrieve-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve spoken voice MP3
+        run: |
+          python - <<'PY'
+          import urllib.request,pathlib,re
+          urls=[
+          'https://www.aidocmaker.com/g0/audio?name=dcc1fd64d28a4299a9cb1579be690536',
+          'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/8e79e3c6-f819-4b61-aa99-82044f1fc64f.mp3']
+          out=pathlib.Path('publications/audio')
+          out.mkdir(parents=True,exist_ok=True)
+          for idx,url in enumerate(urls):
+              try:
+                  q=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'*/*'})
+                  with urllib.request.urlopen(q,timeout=35) as r:
+                      b=r.read(16000000)
+                      t=r.headers.get('Content-Type','')
+                      print('RESULT',idx,r.status,t,len(b),r.url,flush=True)
+                      if t.startswith('audio/') or b[:3]==b'ID3':
+                          (out/('deep_male_full.mp3' if idx==0 else 'deep_male_preview.mp3')).write_bytes(b)
+                      else:
+                          s=b[:10000].decode('utf8','replace')
+                          print('HEAD',s[:2000],flush=True)
+                          candidates=re.findall(r'https?://[^ ]+?mp3',s)
+                          print('CANDIDATES',candidates[:5],flush=True)
+              except Exception as e: print('FETCH_FAILURE',idx,repr(e),flush=True)
+          PY
+      - name: Save approved audio
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/audio
+          if ! git diff --cached --quiet; then
+            git commit -m 'Save approved voiceover audio'
+            git pull --rebase
+            git push
+          fi
