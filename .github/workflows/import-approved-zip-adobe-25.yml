@@ -1,0 +1,42 @@
+name: Publishable approved carousel 25 from Adobe
+on:
+  push:
+    paths:
+      - '.github/workflows/import-approved-zip-adobe-25.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exactly approved archive
+        run: |
+          curl --fail --location --silent --show-error --max-time 95 'https://at.adobe.com/Sv2rEu2TSdqN0ozk' -o /tmp/approved.zip
+          file /tmp/approved.zip
+          python - <<'PY'
+          import zipfile,pathlib
+          b=pathlib.Path('/tmp/approved.zip').read_bytes()
+          print('ZIP_BYTES',len(b),b[:12],flush=True)
+          if b[:2]!=b'PK':raise RuntimeError('Adobe URL did not return source ZIP file')
+          z=zipfile.ZipFile('/tmp/approved.zip')
+          root=pathlib.Path('publications/approved/2026-11-25')
+          root.mkdir(parents=True,exist_ok=True)
+          for n in range(1,6):
+              name='2026-11-25/slide_%02d.jpg'%n
+              data=z.read(name)
+              if len(data)<40000:raise Exception('Wrong approved image '+name)
+              (root/('slide_%02d.jpg'%n)).write_bytes(data)
+              print('IMPORTED',name,len(data),flush=True)
+          (root/'caption.txt').write_bytes(z.read('2026-11-25/ПОДПИСЬ.txt'))
+          PY
+      - name: Store approved publication media
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/approved/2026-11-25
+          git commit -m 'Import verified approved 25 November Instagram carousel'
+          git pull --rebase
+          git push
