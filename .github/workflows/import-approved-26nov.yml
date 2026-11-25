@@ -1,0 +1,43 @@
+name: Import final approved Instagram 26 Nov
+on:
+  push:
+    paths:
+      - '.github/workflows/import-approved-26nov.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-approved:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact user approved 26 November package
+        run: |
+          curl --fail --location --silent --show-error --max-time 95 'https://at.adobe.com/2qk0aRyCQqVKl4L2' -o /tmp/approved_26nov.zip
+          python - <<'PY'
+          import pathlib,zipfile
+          b=pathlib.Path('/tmp/approved_26nov.zip').read_bytes()
+          if b[:2]!=b'PK':raise RuntimeError('Transfer did not yield ZIP')
+          z=zipfile.ZipFile('/tmp/approved_26nov.zip')
+          root=pathlib.Path('publications/approved/2026-11-26')
+          root.mkdir(parents=True,exist_ok=True)
+          for n in range(1,6):
+              name=f'2026-11-26/slide_{n:02d}.jpg'
+              data=z.read(name)
+              if len(data)<40000:raise RuntimeError('Unusually small image '+name)
+              (root/f'slide_{n:02d}.jpg').write_bytes(data)
+              print('OK',name,len(data),flush=True)
+          c=z.read('2026-11-26/caption.txt').decode('utf-8')
+          if len(c)<300:raise RuntimeError('Caption missing')
+          (root/'caption.txt').write_text(c,encoding='utf-8')
+          print('CAPTION',len(c),flush=True)
+          PY
+      - name: Commit user-approved assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/approved/2026-11-26
+          git commit -m 'Import corrected approved 26 November carousel'
+          git pull --rebase
+          git push
