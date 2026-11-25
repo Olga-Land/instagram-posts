@@ -1,0 +1,43 @@
+name: Build approved-logo Reel 26 Nov voice and rain
+on:
+  push:
+    paths: ['.github/workflows/build-strong-reel-26nov.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install audio/video tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Download exact new video package and approved Deep voice
+        run: |
+          curl -fLsS --retry 3 --max-time 100 'https://at.adobe.com/50v7iYaMklD0j9nD' -o /tmp/strong_reel.zip
+          python - <<'PY'
+          import zipfile,pathlib
+          z=zipfile.ZipFile('/tmp/strong_reel.zip')
+          names=z.namelist()
+          print('ARCHIVE',names[:12],flush=True)
+          v=next(n for n in names if n.endswith('Reel_26Nov_REVIEW_VISUAL.mp4'))
+          data=z.read(v)
+          assert len(data)>500000
+          pathlib.Path('/tmp/visual.mp4').write_bytes(data)
+          PY
+          curl -fLsS --retry 3 --max-time 60 'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/04c8a2a3-e8e6-454f-ac8d-c87311b40388.mp3' -o /tmp/deep.mp3
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 /tmp/visual.mp4 /tmp/deep.mp3 || true
+      - name: Mix deep male with quiet rain at matched duration
+        run: |
+          mkdir -p publications/reels/2026-11-26-to-12-02/new-review
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/visual.mp4 -i /tmp/deep.mp3 -f lavfi -i 'anoisesrc=color=pink:amplitude=0.10:sample_rate=48000' -filter_complex '[1:a]aresample=48000,volume=1.0[voice];[2:a]lowpass=f=1500,highpass=f=110,volume=0.055[rain];[voice][rain]amix=inputs=2:duration=longest:normalize=0[a]' -map 0:v:0 -map '[a]' -c:v copy -c:a aac -b:a 160k -shortest -movflags +faststart publications/reels/2026-11-26-to-12-02/new-review/Reel_26Nov_NEW_STRONG_DEEP_RAIN.mp4
+          ffprobe -v error -show_entries stream=codec_type,codec_name -of compact publications/reels/2026-11-26-to-12-02/new-review/Reel_26Nov_NEW_STRONG_DEEP_RAIN.mp4
+      - name: Save for review only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-26-to-12-02/new-review/Reel_26Nov_NEW_STRONG_DEEP_RAIN.mp4
+          git commit -m 'New sharp 26-Nov Reel with exact master logo and deep male voice'
+          git pull --rebase
+          git push
