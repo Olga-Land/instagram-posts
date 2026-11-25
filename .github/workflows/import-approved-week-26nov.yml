@@ -1,0 +1,44 @@
+name: Import visually approved 26Nov-02Dec week
+on:
+  push:
+    paths: ['.github/workflows/import-approved-week-26nov.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact approved week
+        run: |
+          curl -fLsS --retry 3 --max-time 120 'https://at.adobe.com/zNZaiC9OBEUWquKb' -o /tmp/approved-week.zip
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          b=Path('/tmp/approved-week.zip').read_bytes()
+          if b[:2]!=b'PK':raise RuntimeError('Failed to retrieve approved media archive')
+          out=Path('publications/approved/week-2026-11-26-to-12-02')
+          with ZipFile('/tmp/approved-week.zip') as z:
+              for day in ('2026-11-26','2026-11-27','2026-11-28','2026-11-29','2026-11-30','2026-12-01','2026-12-02'):
+                  folder=out/day
+                  folder.mkdir(parents=True,exist_ok=True)
+                  for k in range(1,6):
+                      n=f'{day}/slide_{k:02d}.jpg'
+                      dat=z.read(n)
+                      if len(dat)<40000:raise RuntimeError('Invalid image: '+n)
+                      (folder/f'slide_{k:02d}.jpg').write_bytes(dat)
+                  cap=z.read(f'{day}/caption.txt').decode('utf-8')
+                  if len(cap)<300:raise RuntimeError('Caption too short: '+day)
+                  (folder/'caption.txt').write_text(cap,encoding='utf-8')
+                  print('IMPORTED',day,'5 slides, caption chars',len(cap),flush=True)
+          PY
+      - name: Commit approved media
+        run: |
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name 'github-actions[bot]'
+          git add publications/approved/week-2026-11-26-to-12-02
+          git commit -m 'Import seven user-approved carousel sets for 26 Nov to 2 Dec'
+          git pull --rebase
+          git push
