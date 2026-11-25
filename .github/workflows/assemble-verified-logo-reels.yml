@@ -1,0 +1,64 @@
+name: Assemble seven verified logo reels with Deep Male
+on:
+  push:
+    paths: ['.github/workflows/assemble-verified-logo-reels.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Fetch seven clean video drafts with verified original logo
+        run: |
+          curl -fLsS --retry 3 --max-time 120 'https://at.adobe.com/HFehUwjWKQhFlGvT' -o /tmp/verified-reels.zip
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          b=Path('/tmp/verified-reels.zip').read_bytes()
+          if b[:2]!=b'PK':raise RuntimeError('Failed to fetch source ZIP')
+          out=Path('/tmp/verified-visuals');out.mkdir()
+          with ZipFile('/tmp/verified-reels.zip') as z:
+              for d in ['2026-11-26','2026-11-27','2026-11-28','2026-11-29','2026-11-30','2026-12-01','2026-12-02']:
+                  n=f'{d}/Reel_{d}_VISUAL.mp4'
+                  data=z.read(n)
+                  if len(data)<500000:raise RuntimeError('Invalid video '+d)
+                  (out/f'{d}.mp4').write_bytes(data)
+                  print('verified master video',d,len(data),flush=True)
+          PY
+      - name: Fetch natural rain ambience
+        run: |
+          if curl -fLsS --retry 2 --max-time 90 'https://at.adobe.com/UM6tEvgYwE454xYZ' -o /tmp/rain_original.mp4 && ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 /tmp/rain_original.mp4 | grep -q .; then
+            echo 'REAL_RAIN_AVAILABLE=1' >> "$GITHUB_ENV"
+          else
+            echo 'REAL_RAIN_AVAILABLE=0' >> "$GITHUB_ENV"
+          fi
+      - name: Mix deep male voice and quiet rain into reviewed videos
+        run: |
+          mkdir -p publications/reels/2026-11-26-to-12-02/final-review
+          for d in 2026-11-26 2026-11-27 2026-11-28 2026-11-29 2026-11-30 2026-12-01 2026-12-02; do
+            v="/tmp/verified-visuals/$d.mp4"
+            a="publications/reels/2026-11-26-to-12-02/audio/$d.mp3"
+            o="publications/reels/2026-11-26-to-12-02/final-review/Reel_$d_MASTER_DEEP_MALE.mp4"
+            test -s "$v" && test -s "$a"
+            if [ "$REAL_RAIN_AVAILABLE" = '1' ]; then
+              ffmpeg -hide_banner -loglevel error -y -i "$v" -i "$a" -stream_loop -1 -i /tmp/rain_original.mp4 -filter_complex "[1:a]aresample=48000,volume=1.0[voice];[2:a]aresample=48000,volume=0.13[rain];[voice][rain]amix=inputs=2:duration=longest:normalize=0[m]" -map 0:v:0 -map "[m]" -c:v copy -c:a aac -b:a 160k -t 22.2 -movflags +faststart "$o"
+            else
+              ffmpeg -hide_banner -loglevel error -y -i "$v" -i "$a" -f lavfi -i 'anoisesrc=color=pink:amplitude=0.012:sample_rate=48000' -filter_complex "[1:a]aresample=48000,volume=1.0[voice];[2:a]lowpass=f=2400,volume=0.35[rain];[voice][rain]amix=inputs=2:duration=longest:normalize=0[m]" -map 0:v:0 -map "[m]" -c:v copy -c:a aac -b:a 160k -t 22.2 -movflags +faststart "$o"
+            fi
+            ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "$o" | grep -q aac
+            ffprobe -v error -select_streams v -show_entries stream=codec_name -of csv=p=0 "$o" | grep -q h264
+            echo "OK $d $(du -h "$o" | cut -f1)"
+          done
+      - name: Save seven reels for user visual approval — DO NOT PUBLISH
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-26-to-12-02/final-review
+          git commit -m 'Export seven logo-master-verified voiceover Reels for review'
+          git pull --rebase
+          git push
