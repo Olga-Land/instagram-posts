@@ -1,0 +1,36 @@
+name: Import seven Deep Male voices 26 Nov through 2 Dec
+on:
+  push:
+    paths: ['.github/workflows/import-seven-voiceover-26nov.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch full narration MP3 previews
+        run: |
+          mkdir -p publications/reels/2026-11-26-to-12-02/audio
+          python - <<'PY'
+          import urllib.request,pathlib
+          recordings=[["2026-11-26","845e58e3-bf74-412d-9861-74a4faabbd01"],["2026-11-27","85865231-96ca-4a01-ae09-bdd293f9058b"],["2026-11-28","97470238-d71d-441e-923d-c92db9ef943a"],["2026-11-29","d0d8261a-3167-4156-8784-ea738d95e188"],["2026-11-30","1539c573-818d-4aea-8d87-a8597351f4e1"],["2026-12-01","b2d80dce-92d0-4c4e-85ec-41ab5dc952a0"],["2026-12-02","c23d511f-85e8-4f8b-ac7a-86fe16e450c3"]]
+          dst=pathlib.Path('publications/reels/2026-11-26-to-12-02/audio')
+          for date,file_id in recordings:
+              url=f'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/{file_id}.mp3'
+              with urllib.request.urlopen(url,timeout=35) as r:
+                  data=r.read()
+                  assert r.status==200 and len(data)>50000 and r.headers.get('Content-Type','').startswith('audio/'),(date,len(data))
+              (dst/f'{date}.mp3').write_bytes(data)
+              print(date,len(data),flush=True)
+          PY
+      - name: Save voices
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-26-to-12-02/audio
+          git commit -m 'Save Deep Male voices for seven approved-content Reels'
+          git pull --rebase
+          git push
