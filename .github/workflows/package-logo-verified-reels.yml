@@ -1,0 +1,35 @@
+name: Package seven logo-verified Reels
+on:
+  push:
+    paths: ['.github/workflows/package-logo-verified-reels.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and package seven Reels
+        run: |
+          python - <<'PY'
+          from zipfile import ZipFile,ZIP_STORED
+          from pathlib import Path
+          dates=['2026-11-26','2026-11-27','2026-11-28','2026-11-29','2026-11-30','2026-12-01','2026-12-02']
+          root=Path('publications/reels/2026-11-26-to-12-02/final-review')
+          dest=Path('publications/reels/REELS_26NOV_02DEC_DEEP_MALE_FOR_APPROVAL.zip')
+          with ZipFile(dest,'w',compression=ZIP_STORED) as z:
+              for d in dates:
+                  p=root/f'Reel_{d}_MASTER_DEEP_MALE.mp4'
+                  assert p.exists() and p.stat().st_size>1000000,d
+                  z.write(p,arcname=f'{d}/{p.name}')
+          print('DONE',str(dest),dest.stat().st_size,flush=True)
+          PY
+      - name: Commit review package
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/REELS_26NOV_02DEC_DEEP_MALE_FOR_APPROVAL.zip
+          git commit -m 'Bundle seven verified original-logo Reels'
+          git pull --rebase
+          git push
