@@ -43,7 +43,7 @@ jobs:
           for d in 2026-11-26 2026-11-27 2026-11-28 2026-11-29 2026-11-30 2026-12-01 2026-12-02; do
             v="/tmp/verified-visuals/$d.mp4"
             a="publications/reels/2026-11-26-to-12-02/audio/$d.mp3"
-            o="publications/reels/2026-11-26-to-12-02/final-review/Reel_$d_MASTER_DEEP_MALE.mp4"
+            o="publications/reels/2026-11-26-to-12-02/final-review/Reel_${d}_MASTER_DEEP_MALE.mp4"
             test -s "$v" && test -s "$a"
             if [ "$REAL_RAIN_AVAILABLE" = '1' ]; then
               ffmpeg -hide_banner -loglevel error -y -i "$v" -i "$a" -stream_loop -1 -i /tmp/rain_original.mp4 -filter_complex "[1:a]aresample=48000,volume=1.0[voice];[2:a]aresample=48000,volume=0.13[rain];[voice][rain]amix=inputs=2:duration=longest:normalize=0[m]" -map 0:v:0 -map "[m]" -c:v copy -c:a aac -b:a 160k -t 22.2 -movflags +faststart "$o"
@@ -59,6 +59,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add publications/reels/2026-11-26-to-12-02/final-review
-          git commit -m 'Export seven logo-master-verified voiceover Reels for review'
+          git commit -m 'Export seven individually named master-logo Reels for review'
           git pull --rebase
           git push
