@@ -11,8 +11,6 @@ jobs:
     timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
-      - name: Install audio/video tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Download exact new video package and approved Deep voice
         run: |
           curl -fLsS --retry 3 --max-time 100 'https://at.adobe.com/50v7iYaMklD0j9nD' -o /tmp/strong_reel.zip
