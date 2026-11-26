@@ -1,0 +1,98 @@
+name: Assemble six REWORKED Reels uncropped and distinct topics
+on:
+  push:
+    paths: ['.github/workflows/reels-27nov-02dec-UNCROPPED-v3.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Retrieve source video archive with new topics
+        run: |
+          curl -fLsS --retry 3 --max-time 130 'https://at.adobe.com/JaT2OaYlDwXNoLjw' -o /tmp/new_silent.zip
+          python - <<'PY'
+          import pathlib,zipfile
+          z=zipfile.ZipFile('/tmp/new_silent.zip')
+          root=pathlib.Path('/tmp/reels_new');root.mkdir(exist_ok=True)
+          for date in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              folder=root/date
+              folder.mkdir(parents=True,exist_ok=True)
+              v=z.read(f'{date}/Reel_{date}_VISUAL.mp4')
+              assert len(v)>500000
+              (folder/'visual.mp4').write_bytes(v)
+              (folder/'caption.txt').write_bytes(z.read(f'{date}/caption.txt'))
+              print('VISUAL_READY',date,len(v),flush=True)
+          (root/'rain.m4a').write_bytes(z.read('rain_ambience.m4a'))
+          PY
+      - name: Download the six newly narrated Deep Male scripts
+        run: |
+          python - <<'PY'
+          import pathlib,urllib.request
+          voices={"2026-11-27":"dd0390f0-41a9-41d9-a539-5076efd63aa2","2026-11-28":"814c812f-01b8-4a15-aa7c-f3678feb5a26","2026-11-29":"94296437-4683-4e41-b56b-4d5c33f461ec","2026-11-30":"1ecc4398-3549-4a03-befe-810a917d930f","2026-12-01":"666aec32-8d2c-4936-9439-8c3afd9ae4d3","2026-12-02":"74f99f33-63f9-4f40-bbd8-67683784bb89"}
+          for date,id in voices.items():
+              u='https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/'+id+'.mp3'
+              with urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'}),timeout=55) as r:
+                  b=r.read()
+                  if len(b)<50000 or not r.headers.get('Content-Type','').startswith('audio/'):raise ValueError('Missing voice '+date)
+              (pathlib.Path('/tmp/reels_new')/date/'voice.mp3').write_bytes(b)
+              print('DEEP_VOICE_READY',date,len(b),flush=True)
+          PY
+      - name: Merge audio, validate first-frame dimensions and tracks
+        run: |
+          python - <<'PY'
+          import pathlib,subprocess,json
+          root=pathlib.Path('/tmp/reels_new')
+          out=pathlib.Path('publications/reels/2026-11-27-to-12-02/REVISION_NO_CROP_V3')
+          out.mkdir(parents=True,exist_ok=True)
+          results=[]
+          for date in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              folder=root/date
+              voice=folder/'voice.mp3'
+              visual=folder/'visual.mp4'
+              voice_d=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(voice)],text=True).strip())
+              video_d=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(visual)],text=True).strip())
+              target=max(video_d,voice_d+0.35)
+              if target>video_d+8:raise ValueError('Unexpected voice/video mismatch: '+date)
+              dest=out/f'Reel_{date}_NEW_TOPIC_DEEP_MALE.mp4'
+              cmd=['ffmpeg','-hide_banner','-loglevel','error','-y',
+                   '-i',str(visual),'-i',str(voice),'-stream_loop','-1','-i',str(root/'rain.m4a'),
+                   '-filter_complex','[0:v]tpad=stop_mode=clone:stop_duration=9[v];[1:a]aresample=48000,volume=1.0,apad=pad_dur=10[speech];[2:a]aresample=48000,volume=0.10[bg];[speech][bg]amix=inputs=2:duration=longest:normalize=0[a]',
+                   '-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k',
+                   '-t',str(round(target,2)),'-movflags','+faststart',str(dest)]
+              subprocess.run(cmd,check=True,timeout=160)
+              meta=subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_type,width,height','-of','json',str(dest)],text=True)
+              streams=json.loads(meta)['streams']
+              assert any(s.get('codec_type')=='audio' for s in streams)
+              assert any(s.get('codec_type')=='video' and s.get('width')==720 and s.get('height')==1280 for s in streams)
+              assert dest.stat().st_size>600000
+              (out/f'{date}_caption.txt').write_bytes((folder/'caption.txt').read_bytes())
+              results.append({'date':date,'output_bytes':dest.stat().st_size,'video_seconds':round(target,2),'voice_seconds':round(voice_d,2),'streams':streams})
+              print('REEL_VERIFIED',date,dest.stat().st_size,flush=True)
+          (out/'VALIDATION.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf8')
+          PY
+      - name: Package all six final Reels in ONE ZIP
+        run: |
+          python - <<'PY'
+          import pathlib,zipfile
+          src=pathlib.Path('publications/reels/2026-11-27-to-12-02/REVISION_NO_CROP_V3')
+          items=sorted(src.iterdir())
+          assert len(list(src.glob('*.mp4')))==6
+          dest=pathlib.Path('publications/reels/REELS_27NOV_02DEC_UNCROPPED_NEW_TOPICS_DEEP_MALE.zip')
+          with zipfile.ZipFile(dest,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=1,allowZip64=True) as z:
+              for p in items:z.write(p,p.name)
+          print('FINAL_ARCHIVE',dest.stat().st_size,flush=True)
+          PY
+      - name: Commit review-only files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-27-to-12-02/REVISION_NO_CROP_V3 publications/reels/REELS_27NOV_02DEC_UNCROPPED_NEW_TOPICS_DEEP_MALE.zip
+          git commit -m 'New topics and uncropped first frames for 27 Nov to 2 Dec Reels'
+          git pull --rebase
+          git push
