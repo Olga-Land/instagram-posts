@@ -63,7 +63,7 @@ jobs:
               cmd=['ffmpeg','-hide_banner','-loglevel','error','-y',
                    '-i',str(video),'-i',str(voice),'-stream_loop','-1','-i',str(source/'rain.m4a'),
                    '-filter_complex','[0:v]tpad=stop_mode=clone:stop_duration=16[v];[1:a]aresample=48000,volume=1.0,apad=pad_dur=20[speech];[2:a]aresample=48000,volume=0.11[bg];[speech][bg]amix=inputs=2:duration=longest:normalize=0[a]',
-                   '-map','[v]','-map','[a]','-c:v','copy','-c:a','aac','-b:a','160k','-t',str(round(target,2)),'-movflags','+faststart',str(dst)]
+                   '-map','[v]','-map','[a]','-c:v','libx264','-preset','veryfast','-crf','24','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-t',str(round(target,2)),'-movflags','+faststart',str(dst)]
               subprocess.run(cmd,check=True,timeout=80)
               inspection=subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_type','-of','csv=p=0',str(dst)],text=True)
               assert 'video' in inspection and 'audio' in inspection,(day,inspection)
