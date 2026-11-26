@@ -1,0 +1,95 @@
+name: Final six Reels from approved covers with Deep Male
+on:
+  push:
+    paths: ['.github/workflows/export-final-six-26nov-covers.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Download source videos and natural rain
+        run: |
+          curl -fLsS --retry 3 --max-time 110 'https://at.adobe.com/w1Y4LbHZUHvNUNPV' -o /tmp/approved_video_sources.zip
+          python - <<'PY'
+          import zipfile,pathlib
+          z=zipfile.ZipFile('/tmp/approved_video_sources.zip')
+          root=pathlib.Path('/tmp/reels')
+          for date in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              d=root/date;d.mkdir(parents=True,exist_ok=True)
+              p=f'{date}/Reel_{date}_SILENT.mp4'
+              b=z.read(p)
+              assert len(b)>2000000,(p,len(b))
+              (d/'silent.mp4').write_bytes(b)
+              print('VIDEO',date,len(b),flush=True)
+          r=z.read('rain_from_approved_source.m4a')
+          assert len(r)>30000
+          (root/'rain.m4a').write_bytes(r)
+          PY
+      - name: Fetch complete Deep Male audio for each video
+        run: |
+          python - <<'PY'
+          import pathlib,urllib.request
+          ids={"2026-11-27":"305bf168-685c-43d1-bcf4-e4dfc4ac173c","2026-11-28":"4dda345b-16a6-43df-bbe3-33798b8fe2f4","2026-11-29":"bbefdc07-b9cb-4eb2-af16-00e51238edc3","2026-11-30":"141401a3-27e0-462b-9b1f-90b59adfa7dd","2026-12-01":"df7efef3-c44f-4632-b2a2-1d755d9855ee","2026-12-02":"2053d81e-c930-4314-b496-2ecaa58b8092"}
+          for date,id in ids.items():
+              url=f'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/{id}.mp3'
+              with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=45) as r:
+                  voice=r.read(15000000)
+                  assert r.status==200 and len(voice)>60000 and r.headers.get('Content-Type','').startswith('audio/'),date
+              (pathlib.Path('/tmp/reels')/date/'voice.mp3').write_bytes(voice)
+              print('VOICE',date,len(voice),flush=True)
+          PY
+      - name: Mix voice and rain with complete moving video
+        run: |
+          python - <<'PY'
+          import pathlib,subprocess,json
+          out=pathlib.Path('publications/reels/2026-11-27-to-12-02/NEW_FINAL_26NOV');out.mkdir(parents=True,exist_ok=True)
+          src=pathlib.Path('/tmp/reels')
+          results=[]
+          for date in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              folder=src/date
+              def duration(p):
+                  return float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(p)],text=True).strip())
+              voice_d=duration(folder/'voice.mp3');visual_d=duration(folder/'silent.mp4')
+              target=max(voice_d+0.5,visual_d)
+              if target>visual_d+12:raise ValueError(f'Unreasonable mismatch {date} {voice_d} {visual_d}')
+              dest=out/f'Reel_{date}_DEEP_MALE_RAIN.mp4'
+              cmd=['ffmpeg','-hide_banner','-loglevel','error','-y',
+                   '-i',str(folder/'silent.mp4'),'-i',str(folder/'voice.mp3'),'-stream_loop','-1','-i',str(src/'rain.m4a'),
+                   '-filter_complex','[0:v]tpad=stop_mode=clone:stop_duration=13[v];[1:a]aresample=48000,volume=1.0,apad=pad_dur=15[voice];[2:a]aresample=48000,volume=0.10[rain];[voice][rain]amix=inputs=2:duration=longest:normalize=0[mixed]',
+                   '-map','[v]','-map','[mixed]','-c:v','libx264','-preset','veryfast','-crf','24','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-t',str(round(target,2)),'-movflags','+faststart',str(dest)]
+              subprocess.run(cmd,check=True,timeout=135)
+              spec=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_type,width,height','-of','json',str(dest)],text=True))['streams']
+              assert any(x.get('codec_type')=='audio' for x in spec)
+              assert any(x.get('codec_type')=='video' and x.get('width')==720 and x.get('height')==1280 for x in spec)
+              assert dest.stat().st_size>1000000
+              results.append({'date':date,'bytes':dest.stat().st_size,'voice_s':round(voice_d,2),'video_s':round(target,2)})
+              print('FINAL_MP4',date,dest.stat().st_size,flush=True)
+          captions={"2026-11-27":"Промоина у водосточной трубы — не просто след дождя.\n\nКрыша собирает воду с большой площади и направляет её к отдельным точкам сброса. Если выход трубы находится у фундамента или вода размывает грунт, важно проследить весь дальнейший маршрут, а не только устранить след размыва.\n\nПроверьте каждую трубу по отдельности: где заканчивается водосток, куда уходит струя, нет ли под ней промоины, не направляется ли вода к ступеням, фундаменту или посадкам. Это первая диагностика, но не проект водоотвода.\n\nВ «Лаборатории ландшафта» разбираем реальные причины сырости и ошибки, которые можно заметить до переделки участка.\n\n#ландшафт #водоотвод #водосток #ландшафтныйдизайн","2026-11-28":"Вода у забора может приходить вовсе не с вашего участка.\n\nЕсли соседняя территория или дорога выше, дождевой поток способен пересекать границу и собираться уже внутри вашего сада. Поэтому самая большая лужа не всегда показывает место возникновения проблемы.\n\nВо время дождя проверьте одну вещь: откуда вода впервые проходит через границу. Затем посмотрите, по какому направлению она движется дальше. Любые дальнейшие работы важно планировать с учётом безопасного водоотвода и границ соседних территорий.\n\nБольше разборов скрытых причин сырости — в «Лаборатории ландшафта».\n\n#ландшафт #дождевойсток #участок #водонаучастке","2026-11-29":"Самая заметная лужа не всегда самая важная точка на участке.\n\nДождь может собирать поверхностную воду с дорожек, газона и площадок в одном небольшом понижении. Визуально кажется, что проблема локальная, однако источник и маршрут могут находиться гораздо дальше.\n\nПолезное наблюдение: отметьте, где появилась первая вода, из каких направлений она подошла и сколько оставалась после дождя. Не засыпайте понижение без понимания того, куда после этого направится сток.\n\nВ «Лаборатории ландшафта» разбираем логику движения воды понятным языком.\n\n#рельефучастка #ландшафтныйдизайн #лужи #дождевойсток","2026-11-30":"Дорожка сухая, а рядом долго мокрый цветник. Иногда причина в твёрдом покрытии.\n\nПлитка и бетон почти не впитывают дождевую воду. Вместо этого поверхность направляет её по уклону — порой прямо к посадкам. При такой ситуации дополнительные растения или замена грунта могут не решить причину.\n\nВо время дождя посмотрите, идёт ли тонкий поток вдоль кромки, где он пересекает бордюр и в какую часть цветника попадает. Это поможет выбрать место для дальнейшего обследования.\n\nВ «Лаборатории ландшафта» рассказываем о скрытых маршрутах воды.\n\n#ландшафт #дорожки #цветник #вода","2026-12-01":"Небольшая садовая кромка способна развернуть тонкий поток воды.\n\nБордюр не обязательно является проблемой сам по себе. Но если он перекрывает естественное направление поверхностного стока, вода может идти вдоль дорожки и собираться в другом месте.\n\nПроверьте, где поток встречает препятствие и куда начинает двигаться после него. Ориентируйтесь на реальный дождь и следы воды, а не только на внешний вид участка в сухую погоду.\n\nВ «Лаборатории ландшафта» показываем, как небольшие детали меняют всю картину водоотвода.\n\n#бордюр #дождевойсток #мощение #ландшафт","2026-12-02":"После дождя на участке остаются подсказки, которые быстро исчезают.\n\nСледы размыва, наносы песка, мокрые полосы и отдельные лужи помогают восстановить маршрут воды. Но гораздо полезнее фиксировать не только место скопления, а также источник и направление стока.\n\nСделайте фотографии с нескольких точек, отметьте, где вода появилась первой, куда двигалась и как долго сохранялась. Эти записи пригодятся для последующего анализа и разговора со специалистом.\n\nВ «Лаборатории ландшафта» учимся видеть закономерности, а не бороться с отдельными лужами.\n\n#участокпоследождя #водоотвод #ландшафтнаяархитектура"}
+          for date,c in captions.items():(out/f'{date}_CAPTION.txt').write_text(c,encoding='utf8')
+          (out/'VERIFICATION.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf8')
+          PY
+      - name: Zip six finished MP4s and captions
+        run: |
+          python - <<'PY'
+          import pathlib,zipfile
+          folder=pathlib.Path('publications/reels/2026-11-27-to-12-02/NEW_FINAL_26NOV')
+          assert len(list(folder.glob('*.mp4')))==6
+          dest=pathlib.Path('publications/reels/REELS_27NOV_02DEC_FINAL_APPROVAL_WITH_DEEP_MALE.zip')
+          with zipfile.ZipFile(dest,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=1,allowZip64=True) as z:
+              for p in sorted(folder.iterdir()):z.write(p,p.name)
+          print('READY_ZIP',dest,dest.stat().st_size)
+          PY
+      - name: Commit deliverables
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-27-to-12-02/NEW_FINAL_26NOV publications/reels/REELS_27NOV_02DEC_FINAL_APPROVAL_WITH_DEEP_MALE.zip
+          git commit -m 'Export six narrated reels with user approved covers and quiet rain'
+          git pull --rebase
+          git push
