@@ -1,0 +1,105 @@
+name: Mix six approved-cover reels with new compelling Deep Male narrations
+on:
+  push:
+    paths:
+      - '.github/workflows/approved-cover-six-reels-new-voice-27-02.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install audio/video encoder
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Retrieve approved-cover video sources
+        run: |
+          curl -fLsS --retry 3 --max-time 125 'https://at.adobe.com/cUjxDiNiaWHmVp9b' -o /tmp/silent_approved_covers.zip
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          b=Path('/tmp/silent_approved_covers.zip').read_bytes()
+          if b[:2]!=b'PK':raise RuntimeError('Adobe did not provide ZIP source')
+          with ZipFile('/tmp/silent_approved_covers.zip') as z:
+              root=Path('/tmp/reel_sources')
+              for date in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+                  path=root/date;path.mkdir(parents=True,exist_ok=True)
+                  video=z.read(f'{date}/Reel_{date}_SILENT.mp4')
+                  cover=z.read(f'{date}/APPROVED_FIRST_FRAME.jpg')
+                  assert len(video)>1000000 and len(cover)>20000,date
+                  (path/'silent.mp4').write_bytes(video)
+                  (path/'approved_cover.jpg').write_bytes(cover)
+                  print('SILENT_VERIFIED',date,len(video),flush=True)
+              (root/'rain.m4a').write_bytes(z.read('rain_from_approved_source.m4a'))
+          PY
+      - name: Download six distinct full-length Deep Male tracks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import urllib.request
+          voices={"2026-11-27":"384c39bd-4f9c-44a5-8137-72b91a81bec5","2026-11-28":"81570f3f-39ab-4b78-a17c-45d7fc98f861","2026-11-29":"335cfa09-6890-46a0-9584-400bbb11e216","2026-11-30":"92b8690d-0b01-49a6-ac18-c78aa8b11c41","2026-12-01":"16f4cd3f-2fd0-4367-8ffa-83e91de92029","2026-12-02":"6691748f-a50a-44ce-8fc3-e3239dc4bf40"}
+          for date,uid in voices.items():
+              url=f'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/{uid}.mp3'
+              with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=55) as res:
+                  data=res.read(20000000)
+                  if res.status!=200 or len(data)<70000 or not res.headers.get('Content-Type','').startswith('audio/'):
+                      raise RuntimeError('Voiceover not available for '+date)
+              (Path('/tmp/reel_sources')/date/'voice.mp3').write_bytes(data)
+              print('VOICE_VERIFIED',date,len(data),flush=True)
+          PY
+      - name: Time video to entire narration and blend rain at low volume
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess,json
+          root=Path('/tmp/reel_sources')
+          out=Path('publications/reels/2026-11-27-to-12-02/FINAL_LOCKED_COVER_NEW_VOICE')
+          out.mkdir(parents=True,exist_ok=True)
+          captions={"2026-11-27":"Промоина под водосточной трубой — признак, который нельзя оставлять без внимания.\n\nДождь с целой площади кровли собирается в одной точке. Когда труба сбрасывает воду рядом с домом, она может размывать почву и направлять поток к фундаменту или на соседнее покрытие. Засыпать образовавшуюся промоину недостаточно: нужно определить, где вода пойдёт после следующего дождя.\n\nПростой первый шаг — проверить выход каждой водосточной трубы, направление струи и наличие безопасного пути для воды. Если рядом основание здания, подход требует особой осторожности.\n\nЛаборатория ландшафта — практические наблюдения о воде на участке.\n\n#водосток #ливневаяканализация #ландшафтныйдизайн #водаНаУчастке","2026-11-28":"Самая большая лужа у забора не всегда показывает, откуда пришла вода.\n\nИногда участок находится немного ниже дороги или соседней территории. Во время дождя поверхностный сток проходит через небольшую точку на границе и уже внутри собирается в заметную лужу.\n\nПрежде чем что-то засыпать или копать, осмотрите нижний край ограждения во время дождя. Найдите место, где вода впервые появляется на вашей стороне, и проследите её путь. Решение необходимо выбирать с учётом рельефа и интересов соседей.\n\nЛаборатория ландшафта — учимся замечать причины, а не только последствия.\n\n#водаНаУчастке #дождевойСток #ландшафтнаяАрхитектура","2026-11-29":"Лужа в самом низком углу — не обязательно место, где возникла проблема.\n\nПоверхностная вода может приходить туда сразу с нескольких покрытий и зон газона. Подсыпка одной ямки меняет отметку поверхности, но часто лишь переносит воду в соседнее место.\n\nВо время дождя полезно зафиксировать, с какой стороны вода начинает поступать первой и какие препятствия стоят на её пути. Это простое наблюдение помогает избежать неверного решения ещё до земляных работ.\n\nВ Лаборатории ландшафта разбираем движение воды без преувеличений и универсальных рецептов.\n\n#рельефУчастка #водоотвод #ландшафтныйДизайн","2026-11-30":"Почему один угол газона мокнет после дождя сильнее остальных?\n\nПричина иногда не в почве или траве. Твёрдая поверхность террасы почти не впитывает осадки и может собирать воду в одном углу. Снаружи всё выглядит аккуратно, но газон принимает дополнительный поток.\n\nПосмотрите на кромку покрытия во время дождя. Если тонкая струйка постоянно переливается в одну точку, сначала нужно исследовать маршрут стока и безопасный выход воды, а не заменять газон.\n\nЛаборатория ландшафта — наблюдения, которые помогают избежать ненужных переделок.\n\n#терраса #мощение #водонаучастке #ландшафтныйдизайн","2026-12-01":"Бордюр может незаметно направлять воду совсем не туда, куда планировалось.\n\nДаже небольшая кромка меняет путь поверхностного стока: вода идёт вдоль дорожки, обходит препятствие и иногда собирается возле цветника. Сам бордюр не обязательно ошибка. Важно то, где поток найдёт выход.\n\nВо время дождя посмотрите на два места — точку поворота тонкой струйки и место, где она заканчивается. Эта пара наблюдений даёт полезную подсказку до любых работ.\n\nВ Лаборатории ландшафта разбираем скрытую логику воды на участке.\n\n#бордюр #дождевойсток #мощение #ландшафтнаяархитектура","2026-12-02":"Одна фотография лужи редко объясняет причину сырости участка.\n\nГораздо полезнее снять четыре связанные точки: откуда предположительно приходит вода, по чему она движется, где задерживается и куда уходит после этого. Добавьте ориентир в кадре — угол дома, край дорожки или забор. Тогда наблюдения после разных дождей можно сопоставить.\n\nЧетыре последовательных фотографии не заменят обследование, но заметно упрощают разговор со специалистом и помогают не упустить существенные детали.\n\nЛаборатория ландшафта — практический разбор водоотвода и благоустройства.\n\n#водонаучастке #ливневка #осмотрУчастка #ландшафтныйдизайн"}
+          checked=[]
+          for date in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              inp=root/date
+              def dur(f):
+                  return float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(f)],text=True).strip())
+              video_d=dur(inp/'silent.mp4');voice_d=dur(inp/'voice.mp3')
+              target=max(video_d,voice_d+0.35)
+              ratio=target/video_d
+              if ratio>1.7:raise RuntimeError(f'Narration too long for story on {date}: ratio={ratio}')
+              path=out/f'Reel_{date}_DEEP_MALE_FINAL.mp4'
+              filt=f'[0:v]setpts={ratio:.8f}*(PTS-STARTPTS),fps=24,format=yuv420p[v];[1:a]aresample=48000,volume=1.0,apad=pad_dur=12[speech];[2:a]aresample=48000,volume=0.10[rain];[speech][rain]amix=inputs=2:duration=longest:normalize=0[a]'
+              cmd=['ffmpeg','-hide_banner','-loglevel','error','-y','-i',str(inp/'silent.mp4'),'-i',str(inp/'voice.mp3'),'-stream_loop','-1','-i',str(root/'rain.m4a'),'-filter_complex',filt,'-map','[v]','-map','[a]','-c:v','libx264','-preset','veryfast','-crf','22','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-t',str(round(target,2)),'-movflags','+faststart',str(path)]
+              subprocess.run(cmd,check=True,timeout=140)
+              spec=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_type,width,height','-of','json',str(path)],text=True))['streams']
+              assert any(s.get('codec_type')=='audio' for s in spec) and any(s.get('codec_type')=='video' and s.get('width')==720 and s.get('height')==1280 for s in spec)
+              assert path.stat().st_size>800000
+              (out/f'{date}_caption.txt').write_text(captions[date],encoding='utf8')
+              (out/f'{date}_approved_cover.jpg').write_bytes((inp/'approved_cover.jpg').read_bytes())
+              checked.append({'date':date,'bytes':path.stat().st_size,'video_seconds':round(target,2),'full_voice_seconds':round(voice_d,2),'source_video_seconds':round(video_d,2),'approved_cover_locked':True})
+              print('FINAL_OK',date,path.stat().st_size,round(target,2),flush=True)
+          (out/'CHECKED.json').write_text(json.dumps(checked,indent=2),encoding='utf8')
+          PY
+      - name: ZIP finished narrated MP4s and captions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile,ZIP_DEFLATED
+          folder=Path('publications/reels/2026-11-27-to-12-02/FINAL_LOCKED_COVER_NEW_VOICE')
+          assert len(list(folder.glob('*.mp4')))==6
+          output=Path('publications/reels/FINAL_APPROVED_COVERS_27NOV_TO_02DEC_DEEP_MALE_REWORK.zip')
+          with ZipFile(output,'w',compression=ZIP_DEFLATED,compresslevel=1,allowZip64=True) as z:
+              for f in sorted(folder.iterdir()):
+                  if f.name.endswith('.mp4') or f.name.endswith('_caption.txt') or f.name=='CHECKED.json':
+                      z.write(f,f.name)
+          assert output.stat().st_size>5000000
+          print('ZIP_OK',output.stat().st_size,flush=True)
+          PY
+      - name: Commit complete MP4s ready for user review
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-27-to-12-02/FINAL_LOCKED_COVER_NEW_VOICE publications/reels/FINAL_APPROVED_COVERS_27NOV_TO_02DEC_DEEP_MALE_REWORK.zip
+          git commit -m 'Rebuild six narrated Reels preserving all approved opening frames'
+          git pull --rebase
+          git push
