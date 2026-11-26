@@ -1,0 +1,94 @@
+name: Assemble six user-approved cover Reels with Deep Male voice
+on:
+  push:
+    paths: ['.github/workflows/assemble-approved-reels-27-02.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Download locally rendered reel sources
+        run: |
+          curl --fail --location --silent --show-error --retry 3 --max-time 140 'https://at.adobe.com/HKehjO3mZdie2GOm' -o /tmp/reel_src.zip
+          python - <<'PY'
+          import zipfile,pathlib
+          z=zipfile.ZipFile('/tmp/reel_src.zip')
+          for day in ["2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              src=f'{day}/Reel_{day}_VISUAL.mp4'
+              data=z.read(src)
+              assert len(data)>500000,src
+              path=pathlib.Path('/tmp/reel_inputs')/day
+              path.mkdir(parents=True,exist_ok=True)
+              (path/'visual.mp4').write_bytes(data)
+              (path/'caption.txt').write_bytes(z.read(f'{day}/caption.txt'))
+              print('VIDEO',day,len(data),flush=True)
+          (pathlib.Path('/tmp/reel_inputs')/'rain.m4a').write_bytes(z.read('rain_from_approved_source.m4a'))
+          PY
+      - name: Download six approved-voice-style Deep Male recordings
+        run: |
+          python - <<'PY'
+          import urllib.request,pathlib
+          voices={"2026-11-27":"a79e72bf-f7c5-41c0-a1ef-146c3f433b78","2026-11-28":"60d426af-bc30-49e9-9d48-9a453e37f184","2026-11-29":"099a1442-5ac7-425d-a50e-6b49fb00b79e","2026-11-30":"8d270017-c620-49ee-9b2c-1016b98d2cf1","2026-12-01":"cef4bf21-6f4f-446d-8ce0-97d0171ea545","2026-12-02":"89d57069-0e64-4c1c-b372-be0cbd69e970"}
+          for day,voice_id in voices.items():
+              url=f'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/{voice_id}.mp3'
+              with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=50) as r:
+                  content=r.read()
+                  assert r.status==200 and len(content)>70000 and r.headers.get('Content-Type','').startswith('audio/'),day
+              (pathlib.Path('/tmp/reel_inputs')/day/'deep_male.mp3').write_bytes(content)
+              print('DEEP_MALE_OK',day,len(content),flush=True)
+          PY
+      - name: Mix natural rain quietly behind speech and verify six MP4s
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess,json
+          source=Path('/tmp/reel_inputs')
+          output=Path('publications/reels/2026-11-27-to-12-02/FINAL_APPROVAL')
+          output.mkdir(parents=True,exist_ok=True)
+          voices={"2026-11-27":"a79e72bf-f7c5-41c0-a1ef-146c3f433b78","2026-11-28":"60d426af-bc30-49e9-9d48-9a453e37f184","2026-11-29":"099a1442-5ac7-425d-a50e-6b49fb00b79e","2026-11-30":"8d270017-c620-49ee-9b2c-1016b98d2cf1","2026-12-01":"cef4bf21-6f4f-446d-8ce0-97d0171ea545","2026-12-02":"89d57069-0e64-4c1c-b372-be0cbd69e970"}
+          results=[]
+          for day in voices:
+              base=source/day
+              voice=base/'deep_male.mp3'
+              video=base/'visual.mp4'
+              duration=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(voice)],text=True).strip())
+              target=max(22.0,duration+0.5)
+              dst=output/f'Reel_{day}_DEEP_MALE.mp4'
+              cmd=['ffmpeg','-hide_banner','-loglevel','error','-y',
+                   '-i',str(video),'-i',str(voice),'-stream_loop','-1','-i',str(source/'rain.m4a'),
+                   '-filter_complex','[0:v]tpad=stop_mode=clone:stop_duration=16[v];[1:a]aresample=48000,volume=1.0,apad=pad_dur=20[speech];[2:a]aresample=48000,volume=0.11[bg];[speech][bg]amix=inputs=2:duration=longest:normalize=0[a]',
+                   '-map','[v]','-map','[a]','-c:v','copy','-c:a','aac','-b:a','160k','-t',str(round(target,2)),'-movflags','+faststart',str(dst)]
+              subprocess.run(cmd,check=True,timeout=80)
+              inspection=subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_type','-of','csv=p=0',str(dst)],text=True)
+              assert 'video' in inspection and 'audio' in inspection,(day,inspection)
+              assert dst.stat().st_size>600000,day
+              (output/f'{day}_caption.txt').write_bytes((base/'caption.txt').read_bytes())
+              results.append({'date':day,'voice_length':duration,'video_length':target,'bytes':dst.stat().st_size})
+              print('READY',day,dst.stat().st_size,'voice',round(duration,2),'video',round(target,2),flush=True)
+          (output/'TECHNICAL_CHECK.json').write_text(json.dumps(results,indent=2),encoding='utf8')
+          PY
+      - name: Package 6 complete MP4s and captions as one archive
+        run: |
+          python - <<'PY'
+          import zipfile,pathlib
+          source=pathlib.Path('publications/reels/2026-11-27-to-12-02/FINAL_APPROVAL')
+          dest=pathlib.Path('publications/reels/REELS_27NOV_02DEC_APPROVED_COVERS_DEEP_MALE_FINAL.zip')
+          with zipfile.ZipFile(dest,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=1,allowZip64=True) as z:
+              for p in sorted(source.iterdir()):z.write(p,p.name)
+          assert len(list(source.glob('*.mp4')))==6
+          print('ARCHIVE_OK',dest.stat().st_size,flush=True)
+          PY
+      - name: Save videos and archive for user's approval
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-27-to-12-02/FINAL_APPROVAL publications/reels/REELS_27NOV_02DEC_APPROVED_COVERS_DEEP_MALE_FINAL.zip
+          git commit -m 'Six final review Reels using user-approved covers and Deep Male narration'
+          git pull --rebase
+          git push
