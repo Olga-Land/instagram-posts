@@ -1,0 +1,87 @@
+name: Package 7 final Reels with Deep Male narration
+on:
+  push:
+    paths:
+      - '.github/workflows/package-seven-final-reels-26nov.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact seven videos from approval package
+        run: |
+          curl -fLsS --retry 3 --max-time 100 'https://at.adobe.com/qDvuCaBCK6kOr8Mg' -o /tmp/silent_reels.zip
+          python - <<'PY'
+          import pathlib,zipfile
+          z=zipfile.ZipFile('/tmp/silent_reels.zip')
+          print('CONTENTS',z.namelist()[:20],flush=True)
+          root=pathlib.Path('/tmp/video_assets')
+          for d in ["2026-11-26","2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              name=f'{d}/Reel_{d}_VISUAL_NO_AUDIO.mp4'
+              data=z.read(name)
+              if len(data)<300000:raise ValueError('Missing video '+name)
+              folder=root/d;folder.mkdir(parents=True,exist_ok=True)
+              (folder/'silent.mp4').write_bytes(data)
+              (folder/'description.txt').write_bytes(z.read(f'{d}/description.txt'))
+          PY
+      - name: Download authentic Deep Male voices
+        run: |
+          python - <<'PY'
+          import pathlib,urllib.request
+          items={"2026-11-26":"2c6866ae-8676-4581-afe3-dc398e615795","2026-11-27":"d7fd0cb0-b8ea-4313-a4ce-35852aee56d6","2026-11-28":"3dc8c07e-7524-41d1-bec3-bf0b2a0dafa3","2026-11-29":"afa8f284-2edf-4577-93c9-b9ef6df2e518","2026-11-30":"e61e2853-0975-42db-92d5-ece7b9d6532d","2026-12-01":"75bcbf3d-e979-4f6b-9a26-47f0da82e7eb","2026-12-02":"9bb1f94a-ed0d-4276-8967-4d4f03b99186"}
+          for d,uid in items.items():
+              url=f'https://storage.googleapis.com/adm--audio-playback--7d--public/mcp-preview/{uid}.mp3'
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+              with urllib.request.urlopen(req,timeout=60) as r:
+                  data=r.read()
+                  if len(data)<50000 or not r.headers.get('Content-Type','').startswith('audio/'):
+                      raise RuntimeError(f'Missing deep narration {d}')
+              pathlib.Path(f'/tmp/video_assets/{d}/voice.mp3').write_bytes(data)
+              print('VOICE',d,len(data),flush=True)
+          PY
+      - name: Mix speech and quiet rain sound into final MP4s
+        run: |
+          mkdir -p publications/reels/2026-11-26-to-12-02/NEW_COMPLETE_WITH_VOICE
+          python - <<'PY'
+          import pathlib,subprocess
+          root=pathlib.Path('/tmp/video_assets')
+          dest=pathlib.Path('publications/reels/2026-11-26-to-12-02/NEW_COMPLETE_WITH_VOICE')
+          for d in ["2026-11-26","2026-11-27","2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02"]:
+              inp=root/d
+              result=dest/f'Reel_{d}_DEEP_MALE_WITH_RAIN.mp4'
+              # Slight continuous Ken Burns zoom enhances motion without changing scene and no blurry overlay.
+              cmd=['ffmpeg','-hide_banner','-loglevel','error','-y',
+                   '-i',str(inp/'silent.mp4'),'-i',str(inp/'voice.mp3'),
+                   '-f','lavfi','-i','anoisesrc=color=pink:amplitude=0.10:sample_rate=48000',
+                   '-filter_complex','[0:v]tpad=stop_mode=clone:stop_duration=12[v];[1:a]aresample=48000,volume=1.0[voice];[2:a]lowpass=f=1750,highpass=f=125,volume=0.045[rain];[voice][rain]amix=inputs=2:duration=first:normalize=0[a]',
+                   '-map','[v]','-map','[a]','-c:v','libx264','-preset','veryfast','-crf','24','-pix_fmt','yuv420p',
+                   '-c:a','aac','-b:a','160k','-shortest','-movflags','+faststart',str(result)]
+              subprocess.run(cmd,check=True,timeout=85)
+              check=subprocess.run(['ffprobe','-v','error','-show_entries','stream=codec_type','-of','csv=p=0',str(result)],capture_output=True,text=True,check=True)
+              streams=check.stdout.strip().splitlines()
+              if 'audio' not in streams or 'video' not in streams:raise RuntimeError(f'Invalid MP4 streams {d}: {streams}')
+              print('COMPLETE',d,result.stat().st_size,streams,flush=True)
+              (dest/f'{d}_description.txt').write_bytes((inp/'description.txt').read_bytes())
+          PY
+      - name: Create one downloadable ZIP archive of seven finished Reels
+        run: |
+          python - <<'PY'
+          import pathlib,zipfile
+          directory=pathlib.Path('publications/reels/2026-11-26-to-12-02/NEW_COMPLETE_WITH_VOICE')
+          zpath=pathlib.Path('publications/reels/REELS_26NOV_02DEC_NEW_DEEP_MALE_ALL_7.zip')
+          with zipfile.ZipFile(zpath,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=1) as archive:
+              for p in sorted(directory.iterdir()):archive.write(p,p.name)
+          print('ARCHIVE',zpath,zpath.stat().st_size,flush=True)
+          PY
+      - name: Commit final audio-video set
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add publications/reels/2026-11-26-to-12-02/NEW_COMPLETE_WITH_VOICE publications/reels/REELS_26NOV_02DEC_NEW_DEEP_MALE_ALL_7.zip
+          git commit -m 'Export 7 new Instagram Reels with deep narration and quiet rain'
+          git pull --rebase
+          git push
