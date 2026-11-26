@@ -1,0 +1,98 @@
+[
+  {
+    "date": "2026-11-27",
+    "output_bytes": 4679652,
+    "video_seconds": 24.0,
+    "voice_seconds": 22.7,
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 720,
+        "height": 1280
+      },
+      {
+        "codec_type": "audio"
+      }
+    ]
+  },
+  {
+    "date": "2026-11-28",
+    "output_bytes": 4611181,
+    "video_seconds": 24.0,
+    "voice_seconds": 20.3,
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 720,
+        "height": 1280
+      },
+      {
+        "codec_type": "audio"
+      }
+    ]
+  },
+  {
+    "date": "2026-11-29",
+    "output_bytes": 5305615,
+    "video_seconds": 24.0,
+    "voice_seconds": 21.34,
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 720,
+        "height": 1280
+      },
+      {
+        "codec_type": "audio"
+      }
+    ]
+  },
+  {
+    "date": "2026-11-30",
+    "output_bytes": 4346915,
+    "video_seconds": 24.0,
+    "voice_seconds": 22.68,
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 720,
+        "height": 1280
+      },
+      {
+        "codec_type": "audio"
+      }
+    ]
+  },
+  {
+    "date": "2026-12-01",
+    "output_bytes": 4468606,
+    "video_seconds": 24.0,
+    "voice_seconds": 21.84,
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 720,
+        "height": 1280
+      },
+      {
+        "codec_type": "audio"
+      }
+    ]
+  },
+  {
+    "date": "2026-12-02",
+    "output_bytes": 4608985,
+    "video_seconds": 24.59,
+    "voice_seconds": 24.24,
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 720,
+        "height": 1280
+      },
+      {
+        "codec_type": "audio"
+      }
+    ]
+  }
+]
