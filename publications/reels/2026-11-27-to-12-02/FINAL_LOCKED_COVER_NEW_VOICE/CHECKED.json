@@ -1,0 +1,50 @@
+[
+  {
+    "date": "2026-11-27",
+    "bytes": 1679351,
+    "video_seconds": 22.46,
+    "full_voice_seconds": 21.43,
+    "source_video_seconds": 22.46,
+    "approved_cover_locked": true
+  },
+  {
+    "date": "2026-11-28",
+    "bytes": 1610877,
+    "video_seconds": 22.46,
+    "full_voice_seconds": 20.78,
+    "source_video_seconds": 22.46,
+    "approved_cover_locked": true
+  },
+  {
+    "date": "2026-11-29",
+    "bytes": 1522939,
+    "video_seconds": 22.46,
+    "full_voice_seconds": 21.31,
+    "source_video_seconds": 22.46,
+    "approved_cover_locked": true
+  },
+  {
+    "date": "2026-11-30",
+    "bytes": 1583006,
+    "video_seconds": 22.46,
+    "full_voice_seconds": 20.21,
+    "source_video_seconds": 22.46,
+    "approved_cover_locked": true
+  },
+  {
+    "date": "2026-12-01",
+    "bytes": 1484496,
+    "video_seconds": 22.46,
+    "full_voice_seconds": 20.74,
+    "source_video_seconds": 22.46,
+    "approved_cover_locked": true
+  },
+  {
+    "date": "2026-12-02",
+    "bytes": 1525232,
+    "video_seconds": 22.77,
+    "full_voice_seconds": 22.42,
+    "source_video_seconds": 22.46,
+    "approved_cover_locked": true
+  }
+]
