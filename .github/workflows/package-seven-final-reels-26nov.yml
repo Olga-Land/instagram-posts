@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
+      - name: Install FFmpeg on runner
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Download exact seven videos from approval package
         run: |
           curl -fLsS --retry 3 --max-time 100 'https://at.adobe.com/qDvuCaBCK6kOr8Mg' -o /tmp/silent_reels.zip
